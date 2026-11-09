@@ -18,10 +18,10 @@
 
 ## 3. Lỗi provider, streaming và Gemini
 
-- [ ] 3.1 Thêm các lớp lỗi phân loại (`RefusalError`, `TruncatedError`, `RateQuotaError`, `DailyQuotaError`, `ProviderError`) và `LLMProvider.stream()` vào `domain/ports.py`; `complete()` mặc định ghép từ `stream()`; cập nhật `echo` để stream từng dòng và giả lập được từng loại lỗi; kiểm tra bằng unit test
-- [ ] 3.2 Hiện thực `providers/gemini.py` (stream, phân loại 429 theo D3, finish reason → truncated/refusal, `reset_at` = 0h Pacific ngày kế); kiểm tra bằng unit test dựa trên fixture của 1.4, không gọi mạng
-- [ ] 3.3 Bổ sung `stream()` và phân loại lỗi cho `anthropic` và `openai_compat`; kiểm tra bằng unit test với client giả
-- [ ] 3.4 Đăng ký `gemini` trong registry, thêm cấu hình `NT_CHAIN`, `GEMINI_API_KEY`, `NT_CHAPTER_CHAR_LIMIT`; báo lỗi cấu hình khi thiếu key mà không in giá trị key; kiểm tra bằng test spec "Missing API key" và "Default chain"
+- [x] 3.1 Thêm các lớp lỗi phân loại (`RefusalError`, `TruncatedError`, `RateQuotaError`, `DailyQuotaError`, `ProviderError`) và `LLMProvider.stream()` vào `domain/ports.py`; `complete()` mặc định ghép từ `stream()`; cập nhật `echo` để stream từng dòng và giả lập được từng loại lỗi; kiểm tra bằng unit test
+- [x] 3.2 Hiện thực `providers/gemini.py` (stream, phân loại 429 theo D3, finish reason → truncated/refusal, `reset_at` = 0h Pacific ngày kế); kiểm tra bằng unit test dựa trên fixture của 1.4, không gọi mạng
+- [x] 3.3 Bổ sung `stream()` và phân loại lỗi cho `anthropic` và `openai_compat`; kiểm tra bằng unit test với client giả
+- [x] 3.4 Đăng ký `gemini` trong registry, thêm cấu hình `NT_CHAIN`, `GEMINI_API_KEY`, `NT_CHAPTER_CHAR_LIMIT`; báo lỗi cấu hình khi thiếu key mà không in giá trị key; kiểm tra bằng test spec "Missing API key" và "Default chain"
 
 ## 4. Chuỗi fallback và quota
 

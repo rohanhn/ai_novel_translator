@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from datetime import datetime
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -18,7 +20,53 @@ from .models import (
 
 
 class TranslationError(RuntimeError):
-    """Lỗi khi gọi LLM (refusal, hết quota, mất kết nối...)."""
+    """Lỗi khi gọi LLM. Provider luôn ném một trong các lớp con bên dưới (không phụ thuộc SDK)."""
+
+    category = "provider_error"
+
+
+class RefusalError(TranslationError):
+    """Model từ chối dịch (safety/policy)."""
+
+    category = "refusal"
+
+
+class TruncatedError(TranslationError):
+    """Output bị cắt (chạm giới hạn token)."""
+
+    category = "truncated"
+
+
+class RateQuotaError(TranslationError):
+    """Hết quota theo phút: chờ `retry_after` giây (nếu provider gợi ý) rồi thử lại."""
+
+    category = "rate_quota"
+
+    def __init__(self, message: str, retry_after: float | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+class DailyQuotaError(TranslationError):
+    """Hết quota theo ngày: chuyển bước trong chuỗi hoặc dừng tới `reset_at`."""
+
+    category = "daily_quota"
+
+    def __init__(self, message: str, reset_at: datetime | None = None):
+        super().__init__(message)
+        self.reset_at = reset_at
+
+
+class ProviderError(TranslationError):
+    """Lỗi API/mạng/cấu hình khác của provider."""
+
+    category = "provider_error"
+
+
+class ProviderConfigError(ProviderError):
+    """Thiếu/sai cấu hình provider (vd. chưa đặt API key). Thông điệp nêu tên biến, không lộ giá trị."""
+
+    category = "config"
 
 
 @runtime_checkable
@@ -26,7 +74,28 @@ class LLMProvider(Protocol):
     name: str
     default_model: str
 
+    def stream(self, request: CompletionRequest) -> Iterator[str]:
+        """Trả về các mẩu text thô theo thứ tự. Lỗi → lớp con của TranslationError; lỗi
+        truncated/refusal phát hiện ở cuối luồng được ném sau mẩu text cuối."""
+        ...
+
     def complete(self, request: CompletionRequest) -> CompletionResult: ...
+
+
+class StreamingProvider:
+    """Lớp nền tiện dụng: `complete()` mặc định ghép kết quả của `stream()`."""
+
+    name: str
+    default_model: str
+
+    def stream(self, request: CompletionRequest) -> Iterator[str]:  # pragma: no cover
+        raise NotImplementedError
+
+    def complete(self, request: CompletionRequest) -> CompletionResult:
+        text = "".join(self.stream(request))
+        return CompletionResult(
+            text=text, provider=self.name, model=request.model or self.default_model
+        )
 
 
 class NovelRepository(Protocol):
