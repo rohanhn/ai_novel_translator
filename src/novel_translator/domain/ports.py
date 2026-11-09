@@ -15,6 +15,7 @@ from .models import (
     GlossarySuggestion,
     Novel,
     ReadingProgress,
+    StepUsage,
     SuggestionStatus,
 )
 
@@ -132,6 +133,20 @@ class NovelRepository(Protocol):
 
     def get_preferences(self) -> dict[str, object]: ...
     def set_preference(self, key: str, value: object) -> None: ...
+
+
+@runtime_checkable
+class QuotaTracker(Protocol):
+    """Đếm lượt dùng thành công theo ngày cho từng bước của chuỗi và ghi nhớ bước nào đã hết
+    quota ngày (tới thời điểm reset). Bước đánh số từ 1."""
+
+    def exhausted_until(self, step: int) -> datetime | None:
+        """Thời điểm reset nếu bước đang hết quota; None nếu dùng được."""
+        ...
+
+    def record_success(self, step: int) -> None: ...
+    def mark_exhausted(self, step: int, until: datetime) -> None: ...
+    def usage_today(self) -> list[StepUsage]: ...
 
 
 class RawChapter(Protocol):

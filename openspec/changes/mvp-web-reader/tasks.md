@@ -25,7 +25,7 @@
 
 ## 4. Chuỗi fallback và quota
 
-- [ ] 4.1 Port `QuotaTracker` + adapter PostgreSQL `provider_usage` (đếm lượt thành công bằng `UPDATE ... requests = requests + 1`, ghi `exhausted_until`, tự hết hiệu lực khi qua thời điểm reset); kiểm tra bằng unit test có điều khiển đồng hồ và test hai thread cùng tăng đếm không mất lượt
+- [x] 4.1 Port `QuotaTracker` + adapter PostgreSQL `provider_usage` (đếm lượt thành công bằng `UPDATE ... requests = requests + 1`, ghi `exhausted_until`, tự hết hiệu lực khi qua thời điểm reset); kiểm tra bằng unit test có điều khiển đồng hồ và test hai thread cùng tăng đếm không mất lượt
 - [ ] 4.2 Hiện thực `providers/chain.py` với policy FOREGROUND/BACKGROUND theo D2 (bỏ qua bước đã hết quota, chuyển bước khi hết quota ngày, backoff tối đa 3 lần khi rate limit, dừng khi gặp lỗi khác hoặc lỗi giữa stream); kiểm tra bằng test cho mọi scenario trong spec `llm-providers` (Primary exhausted, Non-quota error, Whole chain exhausted, Recovered after wait)
 - [ ] 4.3 Nối `ChainProvider` trong `container.py`, giữ khả năng override provider/model từ CLI; kiểm tra bằng test spec "Model override" và "Select provider per request"
 

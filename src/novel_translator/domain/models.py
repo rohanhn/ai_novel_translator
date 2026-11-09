@@ -86,6 +86,15 @@ class ReadingProgress:
 
 
 @dataclass(frozen=True)
+class StepUsage:
+    """Lượt dùng trong ngày của một bước trong chuỗi provider."""
+
+    step: int  # 1-based
+    requests: int
+    exhausted_until: datetime | None = None  # chỉ có giá trị khi bước còn đang hết quota
+
+
+@dataclass(frozen=True)
 class CompletionRequest:
     system: str
     user: str
