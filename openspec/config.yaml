@@ -41,3 +41,5 @@ operations:
   apply:
     guidance:
       - Chạy `.venv/bin/pytest -q` và `.venv/bin/ruff check src tests` trước khi đánh dấu xong
+      - Xong một task mà không có sự cố (kiểm tra của task, pytest, ruff đều pass) → tự tạo 1 commit local cho riêng task đó (chỉ file task đã sửa + checkbox trong tasks.md, không push, không hỏi lại) rồi làm tiếp task kế ngay
+      - Dừng ngay, không commit, không sang task kế khi gặp xung đột (git, thay đổi lạ ở file không đụng tới, spec/design/tasks mâu thuẫn nhau hoặc với code) hoặc khi cần người dùng xác nhận/quyết định

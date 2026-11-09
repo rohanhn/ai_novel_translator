@@ -111,7 +111,13 @@ In both branches, never create the root as a side effect: do not run `openspec i
    - Before editing, confirm the checkbox at the returned `sourcePath` and `line` still matches the task description; if it does not, rerun the apply instructions and use the refreshed location
    - Mark the task complete at its returned `sourcePath` and `line`: `- [ ]` → `- [x]`
    - Rerun the apply instructions and confirm that task is now done and progress changed
-   - Continue to next task
+   - **Commit locally** (project rule): if the task finished with no issue (its verification passed, `.venv/bin/pytest -q` and `.venv/bin/ruff check src tests` pass), stage only the files this task touched plus the `tasks.md` checkbox, and make one local commit — message `<type>(<scope>): <summary> (task <id>)` ending with the attribution trailer. Never push. Do not ask for confirmation for this commit.
+   - Continue to the next task immediately, without waiting for the user
+
+   **Stop immediately (no commit, do not start the next task) if:**
+   - Any conflict: git conflict or unexpected changes in files you did not touch, task text no longer matching its checkbox, spec/design/tasks contradicting each other or the code, or project context contradicting the task
+   - Anything needs the user's confirmation or decision (choice between options, added scope, destructive or outward-facing action, permission denied)
+   - Tests or lint fail and cannot be fixed within the task's scope
 
    **Pause if:**
    - Task is unclear → ask for clarification
@@ -187,6 +193,7 @@ What would you like to do?
 - If implementation reveals issues, pause and suggest artifact updates
 - Keep code changes minimal and scoped to each task
 - Update task checkbox immediately after completing each task
+- One local commit per completed task (never push); stop at the first conflict or anything needing confirmation
 - Pause on errors, blockers, or unclear requirements - don't guess
 - When a task needs work beyond what the spec describes, surface the added scope and pause - never silently narrow, defer, or simplify away specified behavior
 - Only mark a task `- [x]` when its specified behavior is fully implemented, not when it is partially done or deferred
