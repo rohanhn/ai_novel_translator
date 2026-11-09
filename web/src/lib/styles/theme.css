@@ -194,6 +194,8 @@ body {
 	font-size: 15px;
 	line-height: 1.5;
 	overflow-x: hidden;
+	/* Cormorant mặc định dùng số kiểu cổ (0 giống chữ o): dùng số thẳng hàng cho dễ đọc */
+	font-variant-numeric: lining-nums;
 }
 
 a {

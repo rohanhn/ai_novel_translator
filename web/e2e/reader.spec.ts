@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { expectNoHorizontalScroll, expectTouchTargets, login, shot } from './helpers';
+import { expectNoHorizontalScroll, expectTouchTargets, login, shot, translateViaApi, uploadNovel } from './helpers';
 
 // Test làm thay đổi dữ liệu dùng truyện 2 (truyện 1 giữ nguyên cho test mục lục), mỗi project
 // một nhóm chương riêng vì dùng chung một database.
@@ -10,6 +10,10 @@ const CH = (project: string) =>
 test('chương đã dịch hiển thị ngay, không gọi dịch; xem bản gốc; nhãn nguồn gốc', async ({ page }, info) => {
 	const posts: string[] = [];
 	page.on('request', (r) => r.method() === 'POST' && r.url().includes('/translate') && posts.push(r.url()));
+	// Truyện 1 là dữ liệu cố định cho test mục lục: không để tín hiệu đọc kích hoạt prefetch.
+	await page.route('**/api/novels/1/chapters/*/reading-signal', (r) =>
+		r.fulfill({ json: { started: false, reason: 'disabled', chapter_index: null } })
+	);
 	await login(page, '/novels/1/chapters/2');
 	await expect(page.locator('.para').first()).toContainText('[VI]');
 	await expect(page.getByText(/Dịch bằng model dự phòng \(bước 2/)).toBeVisible();
@@ -106,14 +110,17 @@ test('lỗi provider khi gửi yêu cầu (502) hiện lý do', async ({ page })
 });
 
 test('chuyển chương; chương cuối thì nút sau bị tắt; tùy chọn đọc lưu server', async ({ page }, info) => {
-	await login(page, '/novels/1/chapters/1');
+	await login(page);
+	const id = await uploadNovel(page, `chuyen-${info.project.name}`, 3, 2);
+	await translateViaApi(page, id, 1);
+	await page.goto(`/novels/${id}/chapters/1`);
 	await expect(page.getByRole('button', { name: '‹ Chương trước' })).toBeDisabled();
 	await page.getByRole('link', { name: 'Chương 2 ›' }).click();
 	await expect(page).toHaveURL(/chapters\/2$/);
-	await page.goto('/novels/1/chapters/12');
+	await page.goto(`/novels/${id}/chapters/3`);
 	await expect(page.getByRole('button', { name: 'Hết chương' })).toBeDisabled();
 
-	await page.goto('/novels/1/chapters/1');
+	await page.goto(`/novels/${id}/chapters/1`);
 	await page.getByRole('button', { name: 'Giao diện đọc' }).click();
 	const panel = page.getByRole('dialog', { name: 'Giao diện đọc' });
 	await panel.getByRole('button', { name: /Dạ nguyệt/ }).click();

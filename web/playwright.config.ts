@@ -9,6 +9,8 @@ export default defineConfig({
 	workers: 1, // dùng chung một database
 	fullyParallel: false,
 	reporter: 'list',
+	// Backend chạy echo có độ trễ trong cùng máy: cho phép chậm khi máy đang tải nặng.
+	expect: { timeout: 15_000 },
 	use: { baseURL: `http://127.0.0.1:${PORT}`, locale: 'vi-VN', timezoneId: 'Asia/Ho_Chi_Minh' },
 	projects: [
 		{ name: 'mobile', use: { viewport: { width: 360, height: 740 }, hasTouch: true, isMobile: true } },

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { login, translateViaApi, uploadNovel, waitStatus } from './helpers';
+import { login, savedPosition, translateViaApi, uploadNovel, waitStatus } from './helpers';
 
 const signals = (page: Page) => {
 	const sent: string[] = [];
@@ -57,9 +57,7 @@ test('cuộn quá 60% → tín hiệu; tiến độ lưu sau 5 giây và khôi p
 	await expect.poll(() => sent).toEqual(['scrolled_60']);
 
 	await page.clock.runFor(5_500);
-	await expect
-		.poll(async () => (await (await page.request.get(`/api/novels/${id}/progress`)).json())?.position ?? 0)
-		.toBeGreaterThan(0.6);
+	await expect.poll(() => savedPosition(page, id)).toBeGreaterThan(0.6);
 
 	await page.goto(`/novels/${id}`);
 	await page.getByRole('link', { name: /Đọc tiếp · Chương 1/ }).click();
@@ -78,9 +76,7 @@ test('rời trang trước 5 giây vẫn lưu tiến độ (pagehide)', async ({
 	await page.evaluate(() => window.scrollTo(0, (document.documentElement.scrollHeight - innerHeight) * 0.4));
 	await page.waitForTimeout(200);
 	await page.goto('about:blank');
-	await expect
-		.poll(async () => (await (await page.request.get(`/api/novels/${id}/progress`)).json())?.position ?? 0)
-		.toBeGreaterThan(0.3);
+	await expect.poll(() => savedPosition(page, id)).toBeGreaterThan(0.3);
 });
 
 test('nút "Chuẩn bị chương tiếp"', async ({ page }, info) => {

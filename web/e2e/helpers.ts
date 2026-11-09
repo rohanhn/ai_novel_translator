@@ -70,3 +70,9 @@ export async function setProgress(page: Page, novelId: number, index: number, po
 		data: { chapter_index: index, position }
 	});
 }
+
+/** Vị trí đọc đã lưu (0 nếu chưa có; API trả 204 khi chưa đọc). */
+export async function savedPosition(page: Page, novelId: number): Promise<number> {
+	const r = await page.request.get(`/api/novels/${novelId}/progress`);
+	return r.status() === 200 ? (await r.json()).position : 0;
+}

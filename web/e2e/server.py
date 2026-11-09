@@ -49,7 +49,10 @@ def seed(c, tmp: Path) -> None:
 
     a = novel("vu-dong-can-khon", 12, "少年")
     b = novel("pham-nhan-tu-tien", 8, "修仙")
-    novel("gia-thien", 5, "遮天")
+    g = novel("gia-thien", 5, "遮天")
+    for nid in (b, g):  # hàng chờ riêng cho test Danh Lục (mỗi project một truyện)
+        c.repo.add_suggestion(GlossarySuggestion(nid, "苏柔", "Tô Nhu", "nhân vật"))
+        c.repo.add_suggestion(GlossarySuggestion(nid, "青阳镇", "Thanh Dương trấn", "địa danh"))
     for i in (1, 2, 3, 4):
         c.translation.translate_chapter(a, i)
     c.editing.edit_chapter(a, 3, "Tổ thạch", "Bản biên tập tay của chương 3.")

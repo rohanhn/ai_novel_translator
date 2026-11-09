@@ -148,23 +148,26 @@
 		streamParas = [];
 		fallbackStep = null;
 		waiting = null;
+		let saved: Progress | null = null;
 		try {
-			const [nv, list, ch] = await Promise.all([
+			const [nv, list, ch, prog] = await Promise.all([
 				novel?.id === nid ? Promise.resolve(novel) : get<Novel>(`/api/novels/${nid}`),
 				get<ChapterSummary[]>(`/api/novels/${nid}/chapters`),
-				get<Chapter>(`/api/novels/${nid}/chapters/${n}`)
+				get<Chapter>(`/api/novels/${nid}/chapters/${n}`),
+				get<Progress | null>(`/api/novels/${nid}/progress`).catch(() => null)
 			]);
 			novel = nv;
 			chapters = list;
 			chapter = ch;
+			saved = prog;
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 404) phase = { kind: 'missing' };
 			return;
 		}
 		window.scrollTo(0, 0);
 		const ch = chapter!;
-		// Ghi nhận đang đọc chương này (vị trí 0 cho tới khi cuộn).
-		const saved = await get<Progress | null>(`/api/novels/${nid}/progress`).catch(() => null);
+		// Ghi nhận đang đọc chương này (vị trí 0 cho tới khi cuộn). Bắt đầu theo dõi ngay khi
+		// chương hiện ra (cùng lượt cập nhật DOM), không chờ thêm request nào.
 		const resumeAt = saved && saved.chapter_index === n ? saved.position : 0;
 		if (!resumeAt) saveProgress(nid, n, 0);
 		startTracking(nid, n);
