@@ -1,0 +1,32 @@
+[
+ {
+  "text": "Câu này dịch sang",
+  "finish_reason": null,
+  "usage": {
+   "candidates_token_count": 4,
+   "prompt_token_count": 28,
+   "prompt_tokens_details": [
+    {
+     "modality": "TEXT",
+     "token_count": 28
+    }
+   ],
+   "total_token_count": 32
+  }
+ },
+ {
+  "text": "",
+  "finish_reason": "FinishReason.MAX_TOKENS",
+  "usage": {
+   "candidates_token_count": 4,
+   "prompt_token_count": 28,
+   "prompt_tokens_details": [
+    {
+     "modality": "TEXT",
+     "token_count": 28
+    }
+   ],
+   "total_token_count": 32
+  }
+ }
+]

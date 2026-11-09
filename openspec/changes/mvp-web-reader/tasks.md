@@ -2,10 +2,10 @@
 
 ## 1. Quy ước dự án và spike Gemini
 
-- [ ] 1.1 Cập nhật `openspec/config.yaml` theo proposal: bỏ ràng buộc ngang tính năng CLI/API, đặt Gemini là provider mặc định với một request mỗi chương, đổi stack từ SQLite sang PostgreSQL (test cần Postgres local), thêm ràng buộc tuân thủ (API chính thức, không xoay vòng tài khoản, không lách rate limit, không tự động hóa giao diện chat, thư viện riêng tư); kiểm tra bằng `openspec validate mvp-web-reader --strict` vẫn pass
-- [ ] 1.2 Sửa `docs/raw/base-idea.md` mục 4.2: thay dòng "Tự dịch chương kế: Không" bằng quy tắc buffer N+1 (tín hiệu đọc, một chương, chỉ dùng quota bước 1); kiểm tra bằng cách đối chiếu với spec `translation-prefetch`
-- [ ] 1.3 Thêm dependency `google-genai`, `argon2-cffi`, `psycopg[binary,pool]` vào `pyproject.toml`; kiểm tra `uv pip install -e ".[dev]"` thành công
-- [ ] 1.4 Spike: script tạm trong scratchpad gọi Gemini bằng key thật, ghi lại (đã ẩn key) mẫu response stream, mẫu lỗi 429 theo phút/ngày (nếu tái hiện được) và danh sách model free tier khả dụng; lưu mẫu lỗi thành fixture `tests/fixtures/gemini_errors/*.json`; kiểm tra fixture tồn tại và chốt giá trị mặc định cho `NT_CHAIN` trong design.md
+- [x] 1.1 Cập nhật `openspec/config.yaml` theo proposal: bỏ ràng buộc ngang tính năng CLI/API, đặt Gemini là provider mặc định với một request mỗi chương, đổi stack từ SQLite sang PostgreSQL (test cần Postgres local), thêm ràng buộc tuân thủ (API chính thức, không xoay vòng tài khoản, không lách rate limit, không tự động hóa giao diện chat, thư viện riêng tư); kiểm tra bằng `openspec validate mvp-web-reader --strict` vẫn pass
+- [x] 1.2 Sửa `docs/raw/base-idea.md` mục 4.2: thay dòng "Tự dịch chương kế: Không" bằng quy tắc buffer N+1 (tín hiệu đọc, một chương, chỉ dùng quota bước 1); kiểm tra bằng cách đối chiếu với spec `translation-prefetch`
+- [x] 1.3 Thêm dependency `google-genai`, `argon2-cffi`, `psycopg[binary,pool]` vào `pyproject.toml`; kiểm tra `uv pip install -e ".[dev]"` thành công
+- [x] 1.4 Spike: script tạm trong scratchpad gọi Gemini bằng key thật, ghi lại (đã ẩn key) mẫu response stream, mẫu lỗi 429 theo phút/ngày (nếu tái hiện được) và danh sách model free tier khả dụng; lưu mẫu lỗi thành fixture `tests/fixtures/gemini_errors/*.json`; kiểm tra fixture tồn tại và chốt giá trị mặc định cho `NT_CHAIN` trong design.md
 
 ## 2. Storage: PostgreSQL, migration và schema mới
 

@@ -68,7 +68,7 @@ User dán URL truyện
 | Lấy chapter manifest | Có | Chỉ metadata/URL chương hiển thị công khai; không tải raw hàng loạt |
 | Lấy raw chương đầu | Có | Tối đa 1 raw chapter lúc import |
 | Buffer raw chương kế | Có điều kiện | Tối đa 1 chương N+1, chỉ khi user đang đọc/dịch N và nguồn cho phép |
-| Tự dịch chương kế | Không | Chỉ buffer raw, không gọi AI trước khi user yêu cầu |
+| Tự dịch chương kế (buffer N+1) | Có điều kiện | Chỉ sau tín hiệu đọc thật ở chương N (hiển thị ≥30 giây, cuộn ≥60%, hoặc bấm "Chuẩn bị chương tiếp theo"); tối đa một chương N+1 mỗi lần, không dây chuyền; chỉ dùng quota bước 1 của chuỗi provider, bước 1 hết quota ngày thì dừng buffer; không chạy khi N+1 đã dịch/đang dịch/đã biên tập hoặc user tắt prefetch |
 | Cập nhật manifest | Có, thủ công | User-triggered, chỉ delta metadata, có cooldown |
 | Auto-update | Không | Không cron, polling hoặc tự theo dõi chương mới |
 | Crawl full novel | Không | Không bulk queue hoặc `fetchAllChapters()` |

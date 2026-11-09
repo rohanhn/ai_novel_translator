@@ -1,0 +1,87 @@
+[
+ {
+  "t": 0.49,
+  "text": "<<TITLE>>\nChương 1: Lâm Động\n\n<<BODY>>\n",
+  "finish_reason": null,
+  "usage": {
+   "candidates_token_count": 17,
+   "prompt_token_count": 65,
+   "prompt_tokens_details": [
+    {
+     "modality": "TEXT",
+     "token_count": 65
+    }
+   ],
+   "total_token_count": 82
+  },
+  "model_version": "gemini-3.1-flash-lite"
+ },
+ {
+  "t": 0.57,
+  "text": "Lâm Động đứng trên đỉnh núi, dõi mắt nhìn về phía Thanh Dương trấn xa xa. Hắn nắm chặt nắm",
+  "finish_reason": null,
+  "usage": {
+   "candidates_token_count": 42,
+   "prompt_token_count": 65,
+   "prompt_tokens_details": [
+    {
+     "modality": "TEXT",
+     "token_count": 65
+    }
+   ],
+   "total_token_count": 107
+  },
+  "model_version": "gemini-3.1-flash-lite"
+ },
+ {
+  "t": 0.63,
+  "text": " đấm.\n\n<<NAMES>>\n林动 | Lâm Động | Tên riêng\n青阳镇 | Thanh",
+  "finish_reason": null,
+  "usage": {
+   "candidates_token_count": 66,
+   "prompt_token_count": 65,
+   "prompt_tokens_details": [
+    {
+     "modality": "TEXT",
+     "token_count": 65
+    }
+   ],
+   "total_token_count": 131
+  },
+  "model_version": "gemini-3.1-flash-lite"
+ },
+ {
+  "t": 0.68,
+  "text": " Dương trấn | Địa danh",
+  "finish_reason": null,
+  "usage": {
+   "candidates_token_count": 71,
+   "prompt_token_count": 65,
+   "prompt_tokens_details": [
+    {
+     "modality": "TEXT",
+     "token_count": 65
+    }
+   ],
+   "total_token_count": 136
+  },
+  "model_version": "gemini-3.1-flash-lite"
+ },
+ {
+  "t": 0.72,
+  "text": "",
+  "finish_reason": "FinishReason.STOP",
+  "usage": {
+   "candidates_token_count": 71,
+   "prompt_token_count": 65,
+   "prompt_tokens_details": [
+    {
+     "modality": "TEXT",
+     "token_count": 65
+    }
+   ],
+   "total_token_count": 136
+  },
+  "model_version": "gemini-3.1-flash-lite"
+ }
+]

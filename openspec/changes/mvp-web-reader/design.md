@@ -71,6 +71,14 @@ Provider chỉ việc phân loại lỗi thành `RefusalError`, `TruncatedError`
 - `finish_reason` là `MAX_TOKENS` → `TruncatedError`; là `SAFETY` hoặc bị chặn → `RefusalError`.
 - Task đầu tiên là một spike nhỏ dùng key thật để xác nhận định dạng chi tiết lỗi. Unit test dùng fixture của định dạng đó.
 
+**Kết quả spike (2026-11-09, google-genai 3.0.0):**
+- Lỗi 429 thật chứa đồng thời quotaId `...PerDay...` và `...PerMinute...` cùng `RetryInfo` (~20 giờ). Vì vậy phải kiểm tra `PerDay` **trước** `RetryInfo`. Fixture: `tests/fixtures/gemini_errors/`.
+- SDK mặc định gọi API `v1`; một số model chỉ có trên `v1beta` → client tạo với `http_options.api_version="v1beta"`.
+- SDK tự retry bên trong (tenacity) → tắt retry của SDK (số lần thử = 1), để chỉ `ChainProvider` quyết định thử lại, đúng giới hạn của spec "Rate-limit retry".
+- Timeout/lỗi mạng ném `httpx`-style exception (không phải `APIError`) → phân loại thành `ProviderError`. Đặt timeout cho request (mặc định 120 giây, cấu hình qua `NT_GEMINI_TIMEOUT`); một số model đã quan sát treo >5 phút.
+- 404 "no longer available to new users" (model bị gỡ) → `ProviderError` kèm thông điệp gợi ý sửa `NT_CHAIN`.
+- Model "thinking" (`gemini-3.5-flash`) tốn vài trăm token suy nghĩ cho đoạn ngắn và có chunk đầu sau ~20 giây; các bước dùng model có thinking đặt `thinking_level="low"`.
+
 ### D4. Bộ quản lý job dịch trong process
 
 `application/jobs.py` có `TranslationJobManager`:
@@ -177,8 +185,8 @@ Schema trong `001_initial.sql`:
 ### D10. Cấu hình
 
 Thêm các biến:
-- `NT_CHAIN`, ví dụ `gemini:<model-chính>,gemini:<model-nhẹ>`
-- `GEMINI_API_KEY`, `NT_PASSWORD_HASH`, `NT_TRUSTED_PROXY`
+- `NT_CHAIN`, mặc định `gemini:gemini-3.5-flash,gemini:gemini-3.5-flash-lite` (chốt sau spike: các model 2.5 không còn cho user mới, 3.7/3.8-flash quan sát bị 503/treo, Pro có free tier = 0)
+- `GEMINI_API_KEY`, `NT_GEMINI_TIMEOUT`, `NT_PASSWORD_HASH`, `NT_TRUSTED_PROXY`
 - `NT_CHAPTER_CHAR_LIMIT` (mặc định 20000)
 
 `NT_MAX_SEGMENT_CHARS` được thay bằng `NT_CHAPTER_CHAR_LIMIT`. Cấu hình database xem D6. Riêng `NT_PROVIDER`/`NT_MODEL` vẫn dùng cho CLI override.
@@ -264,5 +272,5 @@ Mockup là tham chiếu bố cục và phong cách; hành vi lấy theo spec. Kh
 
 ## Open Questions
 
-- ID model Gemini cụ thể cho hai bước và giới hạn free tier hiện hành: chốt lúc triển khai bằng cách xem AI Studio; chỉ ảnh hưởng giá trị mặc định của `NT_CHAIN`.
+- Giới hạn free tier (RPM/RPD) của `gemini-3.5-flash` và `gemini-3.5-flash-lite`: API không trả về, xem tại https://ai.dev/rate-limit; không hard-code, màn hình quota hiện số đếm thực tế. (ID model đã chốt ở D10.)
 - Ngưỡng 30 giây / 60% cho tín hiệu đọc có thể chỉnh sau khi dùng thật; đổi thì phải cập nhật spec.

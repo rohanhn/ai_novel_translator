@@ -6,15 +6,25 @@ context: |
   SHALL/MUST, WHEN/THEN giữ tiếng Anh để openspec validate hoạt động.
   Kiến trúc hexagonal (xem docs/ARCHITECTURE.md), bắt buộc tuân thủ:
     - domain/ không import framework, DB, hay SDK LLM.
-    - CLI (Typer) và HTTP API (FastAPI) là interface mỏng, chỉ gọi application/services.py.
-      Mọi tính năng người dùng thấy được phải có ở CẢ CLI và API trừ khi proposal nói rõ.
+    - CLI (Typer), HTTP API (FastAPI) và web SPA là interface mỏng, chỉ gọi application/.
+      Web SPA + HTTP API là giao diện chính; CLI là công cụ quản trị/dev, không bắt buộc
+      ngang tính năng với web.
     - Provider LLM mới = 1 class hiện thực LLMProvider + register_provider(); không rẽ nhánh
       theo tên provider trong pipeline/application.
     - Adapter cụ thể chỉ được nối trong container.py.
   Chất lượng dịch là ưu tiên số 1: glossary phải được tôn trọng, không bỏ sót đoạn,
-  giữ thứ tự đoạn. Chi phí LLM là ưu tiên số 2 (tận dụng prompt caching, tránh dịch lại).
+  giữ thứ tự đoạn. Chi phí LLM là ưu tiên số 2 (mục tiêu $0 với Gemini free tier, tránh dịch lại).
+  Provider mặc định: Gemini (key của chủ sở hữu), chạy qua chuỗi fallback cấu hình được.
+  Mỗi chương dịch bằng MỘT request (tiêu đề + nội dung + đề xuất tên); chỉ cắt đoạn khi chương
+  vượt ngưỡng lớn.
+  Tuân thủ (bắt buộc):
+    - Chỉ dùng API chính thức của provider với credential của chính chủ sở hữu.
+    - Không xoay vòng nhiều tài khoản/key cùng provider, không lách rate limit/quota.
+    - Không tự động hóa giao diện chat của các gói tiêu dùng.
+    - Thư viện là riêng tư: không URL công khai, noindex, không chia sẻ bản dịch.
   Test không được gọi LLM thật: dùng provider "echo" hoặc fake.
-  Stack: Python 3.10+, SQLite, pytest, ruff.
+  Stack: Python 3.10+, PostgreSQL (psycopg 3, migration SQL), pytest, ruff, SvelteKit (web/).
+  Test cần PostgreSQL local đang chạy, dùng database test riêng (NT_TEST_DATABASE_URL).
 
 rules:
   proposal:
