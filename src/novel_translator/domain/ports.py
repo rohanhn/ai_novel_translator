@@ -58,6 +58,12 @@ class DailyQuotaError(TranslationError):
         self.reset_at = reset_at
 
 
+class MalformedOutputError(TranslationError):
+    """Output của model không đúng định dạng yêu cầu (vd. thiếu phần BODY) hoặc rỗng."""
+
+    category = "malformed"
+
+
 class ProviderError(TranslationError):
     """Lỗi API/mạng/cấu hình khác của provider."""
 
