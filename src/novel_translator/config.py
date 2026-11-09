@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -58,6 +59,9 @@ class Settings(BaseSettings):
     db_pool_max: int = 5
     # Chỉ cắt chương thành nhiều request khi vượt ngưỡng này (ký tự).
     chapter_char_limit: int = 20000
+
+    # Bản build của web app (SvelteKit SPA). Không tồn tại → chỉ chạy API.
+    web_dir: Path = Path("web/build")
 
     openai_base_url: str | None = None
     ollama_base_url: str = "http://localhost:11434/v1"

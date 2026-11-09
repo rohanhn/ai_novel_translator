@@ -15,8 +15,8 @@ from ...container import Container, get_container
 COOKIE = "nt_session"
 CSRF_HEADER = "X-Requested-With"
 MUTATING = frozenset({"POST", "PUT", "PATCH", "DELETE"})
-# Không cần session: trang login + endpoint login, health check, robots. Tài nguyên tĩnh của
-# SPA được thêm khi phục vụ web (xem is_public).
+# Không cần session: endpoint login, health check, robots. Ngoài ra mọi đường dẫn của web app
+# (shell SPA + asset tĩnh, không chứa dữ liệu) đều công khai, xem is_public.
 PUBLIC_PATHS = frozenset({"/health", "/robots.txt", "/api/auth/login"})
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -28,7 +28,9 @@ def container_of(request: Request) -> Container:
 
 
 def is_public(path: str) -> bool:
-    return path in PUBLIC_PATHS
+    from .web import is_web_path
+
+    return path in PUBLIC_PATHS or is_web_path(path)
 
 
 def client_ip(request: Request, trusted_proxy: str | None) -> str:

@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 
 from ...container import get_container
-from . import errors
+from . import errors, web
 from .auth import auth_middleware
 from .auth import router as auth_router
 from .privacy import ROBOTS_TXT, noindex_middleware
@@ -44,3 +44,7 @@ def health():
 @app.get("/robots.txt", include_in_schema=False)
 def robots_txt():
     return PlainTextResponse(ROBOTS_TXT)
+
+
+# Đăng ký cuối cùng: route bắt-tất-cả của SPA không được che các route ở trên.
+app.include_router(web.router)
