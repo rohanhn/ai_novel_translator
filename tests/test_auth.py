@@ -61,7 +61,7 @@ def test_session_grants_access(anon_client):
     assert anon_client.get("/api/auth/me").status_code == 401
     assert anon_client.post("/api/auth/login", json={"password": TEST_PASSWORD}).status_code == 204
     assert anon_client.get("/api/auth/me").json() == {"authenticated": True}
-    assert anon_client.get("/novels").status_code == 200
+    assert anon_client.get("/api/novels").status_code == 200
 
 
 def test_wrong_password(anon_client, db):
@@ -84,7 +84,8 @@ def test_invalid_hash_format_fails_startup(client_for):
 
 
 def test_unauthenticated_api_calls_return_401(anon_client):
-    for path in ("/novels", "/providers", "/novels/1/chapters", "/api/auth/me", "/docs"):
+    for path in ("/api/novels", "/api/settings", "/api/novels/1/chapters", "/api/auth/me",
+                 "/docs"):
         r = anon_client.get(path)
         assert r.status_code == 401, path
         assert r.json() == {"detail": "Chưa đăng nhập."}
@@ -97,20 +98,20 @@ def test_logout_invalidates_session(api_client):
     assert r.status_code == 204
     assert 'nt_session=""' in r.headers["set-cookie"] or "Max-Age=0" in r.headers["set-cookie"]
     api_client.cookies.set("nt_session", old)
-    assert api_client.get("/novels").status_code == 401
+    assert api_client.get("/api/novels").status_code == 401
 
 
 def test_expired_session(api_client, db):
     with db.connection() as conn:
         conn.execute("UPDATE sessions SET last_seen_at = now() - interval '31 days'")
-    assert api_client.get("/novels").status_code == 401
+    assert api_client.get("/api/novels").status_code == 401
     assert _sessions(db) == 0  # session quá hạn bị dọn
 
 
 def test_active_session_slides(api_client, db):
     with db.connection() as conn:
         conn.execute("UPDATE sessions SET last_seen_at = now() - interval '29 days'")
-    assert api_client.get("/novels").status_code == 200
+    assert api_client.get("/api/novels").status_code == 200
     with db.connection() as conn:
         age = conn.execute("SELECT now() - last_seen_at AS a FROM sessions").fetchone()["a"]
     assert age < timedelta(minutes=1)
@@ -190,7 +191,7 @@ def test_spoofed_x_forwarded_for_ignored_without_trusted_proxy(client_for):
 def test_mutating_request_requires_csrf_header(api_client):
     r = api_client.post("/api/auth/logout", headers={"X-Requested-With": ""})
     assert r.status_code == 403
-    assert api_client.get("/novels").status_code == 200  # GET không cần
+    assert api_client.get("/api/novels").status_code == 200  # GET không cần
 
 
 def test_hash_password_cli():

@@ -14,10 +14,10 @@ def test_every_response_has_noindex_header(anon_client, api_client):
     responses = [
         anon_client.get("/robots.txt"),
         anon_client.get("/health"),
-        anon_client.get("/novels"),  # 401
+        anon_client.get("/api/novels"),  # 401
         anon_client.post("/api/auth/logout", headers={"X-Requested-With": ""}),  # 403
         anon_client.post("/api/auth/login", json={"password": "sai"}),  # 401
-        api_client.get("/novels"),  # 200
+        api_client.get("/api/novels"),  # 200
         api_client.get("/khong-ton-tai"),  # 404
     ]
     for r in responses:

@@ -129,6 +129,16 @@ class ChainProvider(StreamingProvider):
             on_event: Callable[[ChainEvent], None] | None = None) -> ChainRun:
         return ChainRun(self, request, policy, on_event)
 
+    def all_exhausted_until(self, policy: ChainPolicy = ChainPolicy.FOREGROUND
+                            ) -> datetime | None:
+        """Mọi bước được phép (theo policy) đều đang hết quota ngày → thời điểm reset sớm nhất;
+        còn bước dùng được → None. Dùng để từ chối ngay (HTTP 429) trước khi tạo job."""
+        n = 1 if policy == ChainPolicy.BACKGROUND else len(self.links)
+        resets = [self.tracker.exhausted_until(step) for step in range(1, n + 1)]
+        if any(r is None for r in resets):
+            return None
+        return min(resets)
+
     def stream(self, request: CompletionRequest, policy: ChainPolicy = ChainPolicy.FOREGROUND,
                on_event: Callable[[ChainEvent], None] | None = None) -> ChainRun:
         return self.run(request, policy or ChainPolicy.FOREGROUND, on_event)

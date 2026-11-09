@@ -103,6 +103,7 @@ Provider chỉ việc phân loại lỗi thành `RefusalError`, `TruncatedError`
 - Gửi header `X-Accel-Buffering: no` và `Cache-Control: no-cache`, kèm comment keep-alive mỗi 15 giây.
 - Reverse proxy cần tắt buffering cho đường dẫn này; ghi chú trong tài liệu triển khai.
 - Endpoint `POST .../translate` tạo job hoặc gắn vào job có sẵn, và trả ngay `202` cùng URL stream.
+- Trước khi tạo job, endpoint kiểm tra những gì biết được ngay: chương không tồn tại → 404; chương đã biên tập chưa xác nhận → 409; cả chuỗi hết quota ngày → 429 kèm `reset_at`; provider cấu hình sai → 502 kèm loại lỗi. Lỗi xảy ra sau khi đã trả 202 chỉ đi qua sự kiện SSE `failed` (kèm loại lỗi và thông báo).
 
 **Phương án bị loại:** WebSocket. Chỉ cần luồng một chiều, SSE đơn giản hơn và tự reconnect.
 

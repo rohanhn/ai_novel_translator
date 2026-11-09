@@ -245,6 +245,28 @@ class TranslationService:
         self._queue_suggestions(novel_id, glossary, out.names)
         return chapter
 
+    def preflight(self, novel_id: int, index: int, provider: str | None = None,
+                  model: str | None = None, force: bool = False,
+                  confirm_discard_edits: bool = False,
+                  policy: ChainPolicy = ChainPolicy.FOREGROUND) -> Chapter:
+        """Kiểm tra những gì biết được ngay, trước khi tạo job (design D5):
+        - chương không tồn tại → NotFoundError; dịch lại chương đã biên tập chưa xác nhận →
+          ConfirmationRequiredError;
+        - provider không tồn tại → ValueError; cấu hình sai/thiếu key → ProviderConfigError;
+        - mọi bước được phép của chuỗi đang hết quota ngày → DailyQuotaError kèm reset_at.
+        Lỗi phát sinh sau đó (trong lúc dịch) đi qua sự kiện của job."""
+        chapter = self.check_translatable(novel_id, index, force, confirm_discard_edits)
+        if chapter.status in (ChapterStatus.TRANSLATED, ChapterStatus.EDITED) and not force:
+            return chapter
+        model = model or (self.default_model if provider is None else None)
+        llm = self.provider_factory(provider, model)
+        check = getattr(llm, "all_exhausted_until", None)
+        if check is not None and (reset := check(policy)) is not None:
+            raise DailyQuotaError(
+                "Hết quota ngày ở mọi bước được phép của chuỗi provider.", reset_at=reset
+            )
+        return chapter
+
     def check_translatable(self, novel_id: int, index: int, force: bool = False,
                            confirm_discard_edits: bool = False) -> Chapter:
         """Kiểm tra trước khi tạo job: chương tồn tại; dịch lại chương đã biên tập phải có
