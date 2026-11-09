@@ -64,7 +64,7 @@ def _gemini(settings: Settings) -> LLMProvider:
 def _echo(settings: Settings) -> LLMProvider:
     from .echo import EchoProvider
 
-    return EchoProvider()
+    return EchoProvider(delay=settings.echo_delay)
 
 
 register_provider("gemini", _gemini)

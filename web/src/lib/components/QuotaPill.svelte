@@ -5,19 +5,22 @@
 
 	type Step = { step: number; provider: string; exhausted: boolean; reset_at: string | null };
 	let steps = $state<Step[] | null>(null);
+	let override = $state<string | null>(null);
 
 	onMount(async () => {
 		try {
-			steps = (await get<{ steps: Step[] }>('/api/settings/quota')).steps;
+			const q = await get<{ steps: Step[]; provider_override: string | null }>('/api/settings/quota');
+			steps = q.steps;
+			override = q.provider_override;
 		} catch {
 			steps = null;
 		}
 	});
 
-	const provider = $derived(
-		steps?.[0] ? steps[0].provider.charAt(0).toUpperCase() + steps[0].provider.slice(1) : ''
-	);
-	const allOut = $derived(!!steps?.length && steps.every((s) => s.exhausted));
+	const name = $derived(override ?? steps?.[0]?.provider ?? '');
+	const provider = $derived(name.charAt(0).toUpperCase() + name.slice(1));
+	// Có override provider thì không đi qua chuỗi: quota của chuỗi không áp dụng.
+	const allOut = $derived(!override && !!steps?.length && steps.every((s) => s.exhausted));
 </script>
 
 {#if steps}

@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     # Bản build của web app (SvelteKit SPA). Không tồn tại → chỉ chạy API.
     web_dir: Path = Path("web/build")
 
+    # Chỉ cho dev/kiểm tra giao diện: độ trễ (giây) giữa các dòng của provider `echo`.
+    echo_delay: float = 0.0
+
     openai_base_url: str | None = None
     ollama_base_url: str = "http://localhost:11434/v1"
 

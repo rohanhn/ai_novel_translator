@@ -362,3 +362,11 @@ def test_parse_chain_errors():
     for bad in ("", "gemini", "gemini:", ":m"):
         with pytest.raises(ValueError, match="NT_CHAIN"):
             parse_chain(bad)
+
+
+def test_echo_delay_from_settings():
+    from novel_translator.config import Settings
+    from novel_translator.providers.registry import create_provider
+
+    p = create_provider("echo", Settings(_env_file=None, echo_delay=0.25))
+    assert p.delay == 0.25

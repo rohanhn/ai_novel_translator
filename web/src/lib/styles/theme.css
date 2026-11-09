@@ -159,10 +159,17 @@
 
 :root {
 	--font-han: 'Ma Shan Zheng', 'Noto Serif SC', serif;
-	--font-title: 'Cormorant Garamond', 'Noto Serif', Georgia, serif;
+	--font-title: 'Cormorant Garamond', 'Noto Serif', 'Noto Serif SC', Georgia, serif;
 	--font-body: 'Noto Serif', 'Noto Serif SC', Georgia, serif;
 	--font-cjk: 'Noto Serif SC', 'Noto Serif', serif;
-	--font-ui: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-ui: 'Be Vietnam Pro', system-ui, 'Noto Serif SC', -apple-system, 'Segoe UI', sans-serif;
+	/* Bìa truyện: giống nhau ở mọi theme, chữ trên bìa dùng --on-cover */
+	--cover-1: #1e1b16;
+	--cover-2: #23463b;
+	--cover-3: #5a1c14;
+	--cover-4: #26344a;
+	--cover-5: #4a3a22;
+	--on-cover: #f3ede0;
 	--touch: 44px;
 	--gutter: 16px;
 	--reader-size: 18px;
