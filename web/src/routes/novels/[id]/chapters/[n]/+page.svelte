@@ -1,9 +1,13 @@
 <script lang="ts">
+	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
+	import { untrack } from 'svelte';
 	import { ApiError, get, post } from '#lib/api.js';
 	import Modal from '#lib/components/Modal.svelte';
 	import ReaderPanel from '#lib/reader/ReaderPanel.svelte';
 	import { failureReason, followTranslation, formatReset } from '#lib/reader/stream.js';
+	import { ChapterTracker, decisionText, leaveNovel, saveProgress, scrollToRatio } from '#lib/reader/tracker.js';
+	import type { Progress } from '#lib/types.js';
 	import type { Chapter, ChapterSummary, Novel } from '#lib/types.js';
 
 	type Phase =
@@ -29,6 +33,9 @@
 	let panelOpen = $state(false);
 	let confirmRetranslate = $state(false);
 	let stop: (() => void) | null = null;
+	let tracker: ChapterTracker | null = null;
+	let prepareMsg = $state('');
+	let preparing = $state(false);
 
 	const total = $derived(chapters.length);
 	const next = $derived(chapters.find((c) => c.index === index + 1) ?? null);
@@ -107,6 +114,28 @@
 		}
 	}
 
+	function startTracking(nid: number, n: number) {
+		tracker?.stop();
+		prepareMsg = '';
+		tracker = new ChapterTracker(nid, n, (d) => {
+			const text = decisionText(d);
+			if (text) prepareMsg = text;
+		});
+		tracker.start();
+	}
+
+	async function prepareNext() {
+		if (!tracker) return;
+		preparing = true;
+		try {
+			prepareMsg = decisionText(await tracker.explicit());
+		} catch {
+			prepareMsg = 'Không gửi được yêu cầu. Thử lại sau.';
+		} finally {
+			preparing = false;
+		}
+	}
+
 	async function open(nid: number, n: number) {
 		detach();
 		phase = { kind: 'loading' };
@@ -131,7 +160,16 @@
 		}
 		window.scrollTo(0, 0);
 		const ch = chapter!;
-		if (ch.status === 'translated' || ch.status === 'edited') phase = { kind: 'ready' };
+		// Ghi nhận đang đọc chương này (vị trí 0 cho tới khi cuộn).
+		const saved = await get<Progress | null>(`/api/novels/${nid}/progress`).catch(() => null);
+		const resumeAt = saved && saved.chapter_index === n ? saved.position : 0;
+		if (!resumeAt) saveProgress(nid, n, 0);
+		startTracking(nid, n);
+		if (ch.status === 'translated' || ch.status === 'edited') {
+			phase = { kind: 'ready' };
+			// Mở lại đúng chỗ đã dừng (sau khi nội dung đã vẽ).
+			if (resumeAt > 0) requestAnimationFrame(() => requestAnimationFrame(() => scrollToRatio(resumeAt)));
+		}
 		else if (ch.job_lane || ch.status === 'translating')
 			attach(`/api/novels/${nid}/chapters/${n}/stream`); // gắn vào job đang chạy (vd. prefetch)
 		else if (ch.status === 'failed') phase = { kind: 'failed', reason: 'Lần dịch trước bị lỗi.' };
@@ -139,8 +177,20 @@
 	}
 
 	$effect(() => {
-		open(novelId, index);
-		return detach;
+		const [nid, n] = [novelId, index];
+		// Chỉ chạy lại khi đổi chương; state đọc bên trong open() không phải dependency.
+		untrack(() => open(nid, n));
+		return () => {
+			detach();
+			tracker?.stop();
+			tracker = null;
+		};
+	});
+
+	// Rời khỏi truyện (sang trang không thuộc truyện này): huỷ prefetch chưa gửi request.
+	beforeNavigate(({ to }) => {
+		const stay = to?.url.pathname.startsWith(`/novels/${novelId}`);
+		if (!stay) leaveNovel(novelId);
 	});
 </script>
 
@@ -245,8 +295,12 @@
 	</article>
 
 	<footer class="nav">
-		{#if next && (next.status === 'translated' || next.status === 'edited')}
+		{#if prepareMsg}
+			<span class="hint" role="status">{prepareMsg}</span>
+		{:else if next && (next.status === 'translated' || next.status === 'edited')}
 			<span class="hint">Chương {next.index} đã dịch sẵn</span>
+		{:else if next}
+			<button class="prepare" disabled={preparing} onclick={prepareNext}>Chuẩn bị chương tiếp</button>
 		{/if}
 		<nav aria-label="Chuyển chương">
 			{#if index > 1}
@@ -475,6 +529,19 @@
 		padding: 8px 16px calc(12px + env(safe-area-inset-bottom));
 		background: var(--paper);
 		border-top: 1px solid var(--line);
+	}
+	.prepare {
+		align-self: center;
+		min-height: var(--touch);
+		padding: 0 12px;
+		border: none;
+		background: transparent;
+		color: var(--cinnabar);
+		font: inherit;
+		font-size: 13px;
+		font-weight: 600;
+		text-decoration: underline;
+		cursor: pointer;
 	}
 	.hint {
 		font-size: 12px;
