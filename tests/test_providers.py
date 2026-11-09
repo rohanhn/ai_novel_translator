@@ -65,9 +65,11 @@ def test_error_categories_are_translation_errors():
 def test_echo_streams_line_by_line_and_complete_joins():
     p = EchoProvider()
     assert isinstance(p, LLMProvider)
-    assert list(p.stream(REQ)) == ["[VI] dòng 1\n", "dòng 2\n", "dòng 3"]
+    assert list(p.stream(REQ)) == ["[VI] dòng 1\n", "[VI] dòng 2\n", "[VI] dòng 3"]
     res = p.complete(REQ)
-    assert res.text == "[VI] dòng 1\ndòng 2\ndòng 3"
+    assert res.text == "[VI] dòng 1\n[VI] dòng 2\n[VI] dòng 3"
+    marked = CompletionRequest(system="", user="<<BODY>>\nxin\n\n<<NAMES>>\n")
+    assert p.complete(marked).text == "<<BODY>>\n[VI] xin\n\n<<NAMES>>\n"
     assert (res.provider, res.model) == ("echo", "echo")
 
 

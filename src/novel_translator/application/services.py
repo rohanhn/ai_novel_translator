@@ -70,12 +70,12 @@ class TranslationService:
         self,
         repo: NovelRepository,
         provider_factory: Callable[[str | None, str | None], LLMProvider],
-        max_segment_chars: int,
+        chapter_char_limit: int,
         default_model: str | None = None,
     ):
         self.repo = repo
         self.provider_factory = provider_factory
-        self.max_segment_chars = max_segment_chars
+        self.chapter_char_limit = chapter_char_limit
         self.default_model = default_model
 
     def translate_chapter(
@@ -96,7 +96,7 @@ class TranslationService:
         # NT_MODEL chỉ áp dụng khi không chỉ định provider; provider khác dùng model mặc định.
         model = model or (self.default_model if provider is None else None)
         translator = ChapterTranslator(
-            self.provider_factory(provider, model), self.max_segment_chars, model=model
+            self.provider_factory(provider, model), self.chapter_char_limit, model=model
         )
         chapter.status = ChapterStatus.TRANSLATING
         self.repo.update_chapter(chapter)

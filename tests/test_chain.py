@@ -52,7 +52,7 @@ def test_primary_success_counts_usage():
     p1, p2 = EchoProvider(name="gemini"), EchoProvider(name="gemini")
     chain = make_chain(p1, p2)
     run = chain.run(REQ)
-    assert "".join(run) == "[VI] dòng 1\ndòng 2"
+    assert "".join(run) == "[VI] dòng 1\n[VI] dòng 2"
     assert (run.step, run.provider, run.model) == (1, "gemini", "model-chinh")
     assert p1.calls[0].model == "model-chinh" and not p2.calls
     assert chain.tracker.success == {1: 1}

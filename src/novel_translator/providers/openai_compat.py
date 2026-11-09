@@ -43,7 +43,7 @@ class OpenAICompatProvider(StreamingProvider):
         self.default_model = default_model
         self._client = client or openai.OpenAI(base_url=base_url, api_key=api_key, max_retries=0)
 
-    def stream(self, request: CompletionRequest) -> Iterator[str]:
+    def stream(self, request: CompletionRequest, policy=None, on_event=None) -> Iterator[str]:
         try:
             chunks = self._client.chat.completions.create(
                 model=request.model or self.default_model,

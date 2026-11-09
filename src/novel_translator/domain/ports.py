@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterable
 from datetime import datetime
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from .models import (
+    ChainEvent,
+    ChainPolicy,
     Chapter,
     CompletionRequest,
     CompletionResult,
@@ -81,9 +83,14 @@ class LLMProvider(Protocol):
     name: str
     default_model: str
 
-    def stream(self, request: CompletionRequest) -> Iterator[str]:
+    def stream(self, request: CompletionRequest, policy: ChainPolicy = ChainPolicy.FOREGROUND,
+               on_event: Callable[[ChainEvent], None] | None = None) -> Iterable[str]:
         """Trả về các mẩu text thô theo thứ tự. Lỗi → lớp con của TranslationError; lỗi
-        truncated/refusal phát hiện ở cuối luồng được ném sau mẩu text cuối."""
+        truncated/refusal phát hiện ở cuối luồng được ném sau mẩu text cuối.
+
+        `policy`/`on_event` chỉ có ý nghĩa với provider ghép (chuỗi fallback); provider đơn
+        bỏ qua. Kết quả có thể có thuộc tính `provider`/`model`/`step` cho biết thực tế đã
+        dùng gì (đọc được sau khi lặp xong)."""
         ...
 
     def complete(self, request: CompletionRequest) -> CompletionResult: ...
@@ -95,7 +102,9 @@ class StreamingProvider:
     name: str
     default_model: str
 
-    def stream(self, request: CompletionRequest) -> Iterator[str]:  # pragma: no cover
+    def stream(self, request: CompletionRequest, policy: ChainPolicy = ChainPolicy.FOREGROUND,
+               on_event: Callable[[ChainEvent], None] | None = None
+               ) -> Iterable[str]:  # pragma: no cover
         raise NotImplementedError
 
     def complete(self, request: CompletionRequest) -> CompletionResult:

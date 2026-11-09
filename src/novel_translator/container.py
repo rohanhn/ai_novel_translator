@@ -86,7 +86,7 @@ def build_container(
         library=LibraryService(repo, TxtLoader()),
         glossary=GlossaryService(repo),
         translation=TranslationService(
-            repo, provider_factory, settings.max_segment_chars, default_model=settings.model
+            repo, provider_factory, settings.chapter_char_limit, default_model=settings.model
         ),
         exports=ExportService(repo, {"txt": TxtExporter()}),
         repo=repo,

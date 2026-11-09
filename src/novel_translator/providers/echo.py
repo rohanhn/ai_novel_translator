@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Iterable, Iterator
 
 from ..domain.models import CompletionRequest
 from ..domain.ports import StreamingProvider, TranslationError
 
+_MARKER = re.compile(r"^\s*<<\s*[A-Z]+\s*>>\s*$")
+
 
 class EchoProvider(StreamingProvider):
-    """Provider giả cho test/dev: trả lại nguyên văn input (tiền tố `[VI] `), không gọi mạng.
+    """Provider giả cho test/dev: trả lại nguyên văn input, không gọi mạng. Mỗi dòng nội dung
+    có tiền tố `[VI] `; dòng dấu mốc (`<<TITLE>>`, `<<BODY>>`...) và dòng trống giữ nguyên, nên
+    output đúng định dạng 3 phần mà pipeline yêu cầu.
 
     - `stream()` phát từng dòng, mỗi dòng cách nhau `delay` giây.
     - `errors`: hàng đợi lỗi cho các lần gọi kế tiếp; phần tử `None` = lần gọi đó thành công.
@@ -35,7 +40,7 @@ class EchoProvider(StreamingProvider):
         self.end_error = end_error
         self.calls = []
 
-    def stream(self, request: CompletionRequest) -> Iterator[str]:
+    def stream(self, request: CompletionRequest, policy=None, on_event=None) -> Iterator[str]:
         self.calls.append(request)
         if self.errors:
             err = self.errors.pop(0)
@@ -44,7 +49,10 @@ class EchoProvider(StreamingProvider):
         return self._lines(request)
 
     def _lines(self, request: CompletionRequest) -> Iterator[str]:
-        lines = f"[VI] {request.user}".splitlines(keepends=True)
+        lines = [
+            line if not line.strip() or _MARKER.match(line) else f"[VI] {line}"
+            for line in request.user.splitlines(keepends=True)
+        ]
         for i, line in enumerate(lines):
             if self.delay:
                 time.sleep(self.delay)

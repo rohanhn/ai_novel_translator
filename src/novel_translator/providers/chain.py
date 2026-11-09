@@ -129,8 +129,9 @@ class ChainProvider(StreamingProvider):
             on_event: Callable[[ChainEvent], None] | None = None) -> ChainRun:
         return ChainRun(self, request, policy, on_event)
 
-    def stream(self, request: CompletionRequest) -> Iterator[str]:
-        return iter(self.run(request))
+    def stream(self, request: CompletionRequest, policy: ChainPolicy = ChainPolicy.FOREGROUND,
+               on_event: Callable[[ChainEvent], None] | None = None) -> ChainRun:
+        return self.run(request, policy or ChainPolicy.FOREGROUND, on_event)
 
     def complete(self, request: CompletionRequest) -> CompletionResult:
         run = self.run(request)

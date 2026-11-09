@@ -124,7 +124,7 @@ class GeminiProvider(StreamingProvider):
                              if self._thinking_level else None),
         )
 
-    def stream(self, request: CompletionRequest) -> Iterator[str]:
+    def stream(self, request: CompletionRequest, policy=None, on_event=None) -> Iterator[str]:
         model = request.model or self.default_model
         try:
             chunks = self._client.models.generate_content_stream(

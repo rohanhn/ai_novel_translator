@@ -51,7 +51,6 @@ class Settings(BaseSettings):
     db_pool_max: int = 5
     # Chỉ cắt chương thành nhiều request khi vượt ngưỡng này (ký tự).
     chapter_char_limit: int = 20000
-    max_segment_chars: int = 3000  # pipeline cũ; bỏ khi chuyển sang một request mỗi chương
 
     openai_base_url: str | None = None
     ollama_base_url: str = "http://localhost:11434/v1"

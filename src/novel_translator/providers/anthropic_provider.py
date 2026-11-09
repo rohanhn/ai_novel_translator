@@ -55,7 +55,7 @@ class AnthropicProvider(StreamingProvider):
             fallbacks="default",
         )
 
-    def stream(self, request: CompletionRequest) -> Iterator[str]:
+    def stream(self, request: CompletionRequest, policy=None, on_event=None) -> Iterator[str]:
         return self._run(request, sink=None)
 
     def _run(self, request: CompletionRequest, sink: list | None) -> Iterator[str]:

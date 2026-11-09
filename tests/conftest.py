@@ -86,7 +86,7 @@ def test_db_url(pg_pool) -> str:
 
 @pytest.fixture
 def container(db):
-    return build_container(Settings(provider="echo", max_segment_chars=50), pool=db)
+    return build_container(Settings(provider="echo"), pool=db)
 
 
 @pytest.fixture
