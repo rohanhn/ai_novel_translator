@@ -38,7 +38,7 @@
 
 ## 6. Job manager và prefetch
 
-- [ ] 6.1 Hiện thực `application/jobs.py` theo D4 (registry một job mỗi chương, hai làn, phát lại sự kiện cho subscriber muộn, nâng job đang chờ lên làn foreground, hủy job đang chờ); kiểm tra bằng test đồng thời dùng provider `echo` có độ trễ
+- [x] 6.1 Hiện thực `application/jobs.py` theo D4 (registry một job mỗi chương, hai làn, phát lại sự kiện cho subscriber muộn, nâng job đang chờ lên làn foreground, hủy job đang chờ); kiểm tra bằng test đồng thời dùng provider `echo` có độ trễ
 - [ ] 6.2 Hiện thực `PrefetchService.on_reading_signal` với đầy đủ điều kiện chặn của spec `translation-prefetch` (N+1 không tồn tại / đã dịch / đang dịch / prefetch tắt / bước 1 hết quota) và chỉ chạy policy BACKGROUND; kiểm tra bằng test cho từng scenario của spec
 
 ## 7. Bộ tên, biên tập, tiến độ, tùy chọn
