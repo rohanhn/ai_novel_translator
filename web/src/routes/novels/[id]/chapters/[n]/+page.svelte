@@ -4,6 +4,7 @@
 	import { untrack } from 'svelte';
 	import { ApiError, get, post } from '#lib/api.js';
 	import Modal from '#lib/components/Modal.svelte';
+	import ChapterEditor from '#lib/reader/ChapterEditor.svelte';
 	import ReaderPanel from '#lib/reader/ReaderPanel.svelte';
 	import { failureReason, followTranslation, formatReset } from '#lib/reader/stream.js';
 	import { ChapterTracker, decisionText, leaveNovel, saveProgress, scrollToRatio } from '#lib/reader/tracker.js';
@@ -32,6 +33,7 @@
 	let showSource = $state(false);
 	let panelOpen = $state(false);
 	let confirmRetranslate = $state(false);
+	let editing = $state(false);
 	let stop: (() => void) | null = null;
 	let tracker: ChapterTracker | null = null;
 	let prepareMsg = $state('');
@@ -141,6 +143,7 @@
 		phase = { kind: 'loading' };
 		chapter = null;
 		showSource = false;
+		editing = false;
 		streamTitle = null;
 		streamParas = [];
 		fallbackStep = null;
@@ -204,12 +207,30 @@
 			<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
 		</a>
 		<span class="novel">{novel?.title ?? ''}</span>
-		<button class="icon han" aria-label={showSource ? 'Xem bản dịch' : 'Xem bản gốc'} aria-pressed={showSource} onclick={() => (showSource = !showSource)}>原</button>
+		{#if !editing}
+			<button class="icon han" aria-label={showSource ? 'Xem bản dịch' : 'Xem bản gốc'} aria-pressed={showSource} onclick={() => (showSource = !showSource)}>原</button>
+			{#if hasTranslation && phase.kind === 'ready'}
+				<button class="icon" aria-label="Biên tập bản dịch" onclick={() => { showSource = false; editing = true; }}>
+					<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+				</button>
+			{/if}
+		{/if}
 		<button class="icon han" aria-label="Giao diện đọc" aria-expanded={panelOpen} onclick={() => (panelOpen = !panelOpen)}>文</button>
 	</header>
 
-	<article class="text" lang={showSource ? 'zh' : 'vi'}>
-		{#if phase.kind === 'missing'}
+	<article class="text" class:wide={editing} lang={showSource ? 'zh' : 'vi'}>
+		{#if editing && chapter}
+			<h1 class="edit-title">Biên tập · Chương {index}</h1>
+			<ChapterEditor
+				{novelId}
+				{chapter}
+				onsaved={(c) => {
+					chapter = c;
+					editing = false;
+				}}
+				oncancel={() => (editing = false)}
+			/>
+		{:else if phase.kind === 'missing'}
 			<p role="alert" class="notice notice-danger">Không có chương {index} trong truyện này.</p>
 		{:else if chapter}
 			<div class="heading">
@@ -225,7 +246,12 @@
 			{:else}
 				{#if phase.kind === 'ready' && chapter}
 					<div class="labels">
-						{#if chapter.status === 'edited'}<p class="notice notice-ok">Đã biên tập tay.</p>{/if}
+						{#if chapter.status === 'edited'}
+							<p class="notice notice-ok">
+								Đã biên tập tay.
+								<button class="link" onclick={() => translate({ force: true })}>Dịch lại chương</button>
+							</p>
+						{/if}
 						{#if (chapter.chain_step ?? 1) > 1}
 							<p class="notice notice-warn">
 								Dịch bằng model dự phòng (bước {chapter.chain_step}{chapter.model ? `, ${chapter.model}` : ''}) vì model chính đã hết lượt.
@@ -294,7 +320,7 @@
 		{/if}
 	</article>
 
-	<footer class="nav">
+	<footer class="nav" hidden={editing}>
 		{#if prepareMsg}
 			<span class="hint" role="status">{prepareMsg}</span>
 		{:else if next && (next.status === 'translated' || next.status === 'edited')}
@@ -320,7 +346,10 @@
 <ReaderPanel bind:open={panelOpen} />
 
 <Modal bind:open={confirmRetranslate} title="Dịch lại chương đã biên tập?" role="alertdialog" tone="danger">
-	<p class="confirm-text">Bản sửa tay của chương này sẽ bị thay bằng bản dịch mới. Không thể hoàn tác.</p>
+	<p class="confirm-text">
+		Bản dịch mới sẽ thay toàn bộ phần bạn đã sửa tay và dùng bộ tên hiện tại. Thao tác tốn 1 lượt dịch
+		và không thể hoàn tác.
+	</p>
 	<div class="box-actions end">
 		<button class="btn" onclick={() => (confirmRetranslate = false)}>Giữ bản sửa</button>
 		<button
@@ -385,6 +414,14 @@
 		font-size: var(--reader-size);
 		line-height: var(--reader-leading);
 		overflow-wrap: break-word;
+	}
+	.text.wide {
+		max-width: 1200px;
+	}
+	.edit-title {
+		margin-bottom: 16px;
+		font-size: 24px;
+		color: var(--ink);
 	}
 	.text[lang='zh'] .para {
 		font-family: var(--font-cjk);
@@ -519,6 +556,9 @@
 		margin: 0;
 		font-size: 14px;
 		line-height: 1.6;
+	}
+	.nav[hidden] {
+		display: none;
 	}
 	.nav {
 		position: sticky;
