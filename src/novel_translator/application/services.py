@@ -23,6 +23,7 @@ from ..domain.ports import (
     SourceLoader,
     TranslationError,
 )
+from ..domain.rename import replace_whole_word
 from ..pipeline.sections import NameItem
 from ..pipeline.translator import ChapterTranslator, TranslatorEvent
 
@@ -82,24 +83,50 @@ class GlossaryService:
 
     def set_term(self, novel_id: int, source: str, target: str, note: str | None = None
                  ) -> GlossaryEntry:
+        """Thêm/sửa một tên. Đổi bản dịch của tên đã có → lan truyền sang các chương đã dịch
+        (design D9). Toàn bộ chạy trong một transaction."""
         source, target = source.strip(), target.strip()
         if not source or not target:
             raise ValueError("Thuật ngữ nguồn và bản dịch không được để trống.")
         self._require_novel(novel_id)
-        current = {g.source_term: g for g in self.repo.list_glossary(novel_id)}.get(source)
-        entry = self.repo.upsert_glossary(GlossaryEntry(novel_id, source, target, note))
-        if current is None or (current.target_term, current.note) != (target, note):
-            self.repo.bump_glossary_version(novel_id)
+        with self.repo.unit_of_work():
+            current = self._get(novel_id, source)
+            entry = self.repo.upsert_glossary(GlossaryEntry(novel_id, source, target, note))
+            if current is None or (current.target_term, current.note) != (target, note):
+                self.repo.bump_glossary_version(novel_id)
+            if current is not None and current.target_term != target:
+                self._propagate(novel_id, source, current.target_term, target)
         return entry
 
     def list_terms(self, novel_id: int) -> list[GlossaryEntry]:
         return self.repo.list_glossary(novel_id)
 
     def remove_term(self, novel_id: int, source: str) -> bool:
-        removed = self.repo.delete_glossary(novel_id, source)
-        if removed:
-            self.repo.bump_glossary_version(novel_id)
+        """Xóa tên; chương bị ảnh hưởng chỉ được gắn nhãn (không thay chữ)."""
+        with self.repo.unit_of_work():
+            removed = self.repo.delete_glossary(novel_id, source)
+            if removed:
+                self.repo.bump_glossary_version(novel_id)
+                self._propagate(novel_id, source, None, None)
         return removed
+
+    def affected_chapters(self, novel_id: int, source: str) -> list[Chapter]:
+        """Chương đã dịch/đã biên tập có raw chứa tên: bị ảnh hưởng nếu đổi/xóa tên này."""
+        return [ch for ch in self.repo.chapters_with_source_term(novel_id, source)
+                if ch.status in (ChapterStatus.TRANSLATED, ChapterStatus.EDITED)]
+
+    def _get(self, novel_id: int, source: str) -> GlossaryEntry | None:
+        return {g.source_term: g for g in self.repo.list_glossary(novel_id)}.get(source)
+
+    def _propagate(self, novel_id: int, source: str, old: str | None, new: str | None) -> None:
+        for ch in self.affected_chapters(novel_id, source):
+            if ch.status == ChapterStatus.TRANSLATED and old and new:
+                ch.translated_text, _ = replace_whole_word(ch.translated_text or "", old, new)
+                if ch.translated_title:
+                    ch.translated_title, _ = replace_whole_word(ch.translated_title, old, new)
+            # chương edited: chỉ gắn nhãn, không bao giờ tự sửa chữ
+            ch.glossary_outdated = True
+            self.repo.update_chapter(ch)
 
     # --- hàng chờ tên do LLM đề xuất ---
     def list_suggestions(self, novel_id: int) -> list[GlossarySuggestion]:

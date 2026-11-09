@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from contextlib import AbstractContextManager
 from datetime import datetime
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -115,6 +116,10 @@ class StreamingProvider:
 
 
 class NovelRepository(Protocol):
+    def unit_of_work(self) -> AbstractContextManager[None]:
+        """Các thao tác trong khối chạy trong một transaction."""
+        ...
+
     def add_novel(self, novel: Novel) -> Novel: ...
     def get_novel(self, novel_id: int) -> Novel | None: ...
     def list_novels(self) -> list[Novel]: ...

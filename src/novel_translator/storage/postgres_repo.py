@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
+from psycopg import Connection
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
@@ -21,17 +25,40 @@ from ..domain.models import (
 class PostgresRepository:
     def __init__(self, pool: ConnectionPool):
         self.pool = pool
+        self._local = threading.local()
+
+    @contextmanager
+    def unit_of_work(self) -> Iterator[None]:
+        """Gom mọi thao tác trong khối (cùng thread) vào một kết nối + một transaction."""
+        if getattr(self._local, "conn", None) is not None:
+            yield  # lồng nhau: dùng transaction ngoài
+            return
+        with self.pool.connection() as conn, conn.transaction():
+            self._local.conn = conn
+            try:
+                yield
+            finally:
+                self._local.conn = None
+
+    @contextmanager
+    def _connection(self) -> Iterator[Connection]:
+        conn = getattr(self._local, "conn", None)
+        if conn is not None:
+            yield conn
+        else:
+            with self.pool.connection() as conn:
+                yield conn
 
     def _one(self, sql: str, params: tuple = ()) -> dict[str, Any] | None:
-        with self.pool.connection() as conn:
+        with self._connection() as conn:
             return conn.execute(sql, params).fetchone()
 
     def _all(self, sql: str, params: tuple = ()) -> list[dict[str, Any]]:
-        with self.pool.connection() as conn:
+        with self._connection() as conn:
             return conn.execute(sql, params).fetchall()
 
     def _rowcount(self, sql: str, params: tuple = ()) -> int:
-        with self.pool.connection() as conn:
+        with self._connection() as conn:
             return conn.execute(sql, params).rowcount
 
     # --- novels ---
@@ -70,7 +97,7 @@ class PostgresRepository:
 
     # --- chapters ---
     def add_chapters(self, chapters: list[Chapter]) -> list[Chapter]:
-        with self.pool.connection() as conn:
+        with self._connection() as conn:
             for ch in chapters:
                 row = conn.execute(
                     "INSERT INTO chapters (novel_id, idx, title, source_text, status, updated_at)"
