@@ -67,7 +67,7 @@
 - [x] 9.7 Chế độ biên tập trong reader (sửa tiêu đề/nội dung, lưu, xác nhận khi dịch lại chương đã sửa) theo artboard "Tiên hiệp · Reader desktop & biên tập"; kiểm tra thủ công
 - [x] 9.8 Trang bộ tên: danh sách term dạng `JadeTablet`, sửa/xóa (cảnh báo số chương bị ảnh hưởng), hàng chờ đề xuất có nút đồng ý / sửa / bỏ qua, theo artboard "Tiên hiệp · Danh Lục"; kiểm tra thủ công một lần đổi tên lan sang chương đã dịch
 - [x] 9.9 Trang cài đặt: theme (Tuyên chỉ/Hoàng quyển/Dạ nguyệt/Trúc lâm), cỡ chữ, giãn dòng (lưu server-side), công tắc prefetch, bảng lượt dùng và trạng thái quota theo từng bước, ghi chú về dữ liệu ở free tier, nút đăng xuất, theo artboard "Tiên hiệp · Thiết lập"; kiểm tra thủ công rằng tùy chọn áp dụng trên trình duyệt khác
-- [ ] 9.10 Kiểm tra mobile-first và nhãn: không có thanh cuộn ngang ở 360px, vùng chạm của điều hướng ≥44px, mọi nhãn tu tiên có nhãn rõ nghĩa đi kèm (spec "Plain-language labels"); kiểm tra bằng DevTools device mode
+- [x] 9.10 Kiểm tra mobile-first và nhãn: không có thanh cuộn ngang ở 360px, vùng chạm của điều hướng ≥44px, mọi nhãn tu tiên có nhãn rõ nghĩa đi kèm (spec "Plain-language labels"); kiểm tra bằng DevTools device mode
 
 ## 10. Đóng gói và triển khai
 
