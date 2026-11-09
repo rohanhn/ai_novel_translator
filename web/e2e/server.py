@@ -69,6 +69,10 @@ def seed(c, tmp: Path) -> None:
     c.repo.add_suggestion(GlossarySuggestion(a, "苏柔", "Tô Nhu", "person"))
     c.repo.add_suggestion(GlossarySuggestion(a, "青阳镇", "Thanh Dương trấn", "place"))
     c.translation.translate_chapter(b, 1)
+    for index in (5, 7):  # chương lỗi cho test reader (truyện b, tách khỏi dữ liệu mục lục)
+        ch = c.repo.get_chapter(b, index)
+        ch.status = ChapterStatus.FAILED
+        c.repo.update_chapter(ch)
     c.reader.save_progress(b, 1, 0.5)
     c.reader.save_progress(a, 4, 0.62)  # đọc gần nhất
 

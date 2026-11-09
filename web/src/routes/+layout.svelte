@@ -17,7 +17,9 @@
 		{ href: '/settings', xianxia: 'Thiết Lập', plain: 'Cài đặt' }
 	];
 
-	const bare = $derived(page.url.pathname.startsWith('/login'));
+	// Trang đăng nhập và reader (toàn màn hình đọc) không có thanh điều hướng chung.
+	const isLogin = $derived(page.url.pathname.startsWith('/login'));
+	const bare = $derived(isLogin || /^\/novels\/\d+\/chapters\//.test(page.url.pathname));
 
 	function current(href: string): boolean {
 		const path = page.url.pathname;
@@ -26,7 +28,7 @@
 
 	onMount(() => {
 		applyPrefs(prefs.value);
-		if (!bare) loadPrefs().catch(() => {});
+		if (!isLogin) loadPrefs().catch(() => {});
 	});
 </script>
 
