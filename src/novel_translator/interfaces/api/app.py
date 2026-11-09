@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from ...application.services import NotFoundError
@@ -16,6 +17,7 @@ from ...ingest.txt_loader import TxtLoader
 from ...providers import available_providers
 from .auth import auth_middleware
 from .auth import router as auth_router
+from .privacy import ROBOTS_TXT, noindex_middleware
 
 
 @asynccontextmanager
@@ -28,7 +30,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Novel Translator API", version="0.1.0", lifespan=lifespan)
 app.middleware("http")(auth_middleware)
+# Đăng ký sau → bọc ngoài cùng: cả response 401/403 của auth cũng có header noindex.
+app.middleware("http")(noindex_middleware)
 app.include_router(auth_router)
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots_txt():
+    return PlainTextResponse(ROBOTS_TXT)
 
 
 # ---------- schemas ----------
