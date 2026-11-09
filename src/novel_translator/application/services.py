@@ -5,9 +5,25 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from ..domain.models import Chapter, ChapterStatus, GlossaryEntry, Novel
-from ..domain.ports import Exporter, LLMProvider, NovelRepository, SourceLoader, TranslationError
-from ..pipeline.translator import ChapterTranslator
+from ..domain.models import (
+    ChainPolicy,
+    Chapter,
+    ChapterStatus,
+    GlossaryEntry,
+    GlossarySuggestion,
+    Novel,
+)
+from ..domain.ports import (
+    DailyQuotaError,
+    Exporter,
+    LLMProvider,
+    NovelRepository,
+    RateQuotaError,
+    SourceLoader,
+    TranslationError,
+)
+from ..pipeline.sections import NameItem
+from ..pipeline.translator import ChapterTranslator, TranslatorEvent
 
 
 class NotFoundError(LookupError):
@@ -85,35 +101,63 @@ class TranslationService:
         provider: str | None = None,
         model: str | None = None,
         force: bool = False,
+        policy: ChainPolicy = ChainPolicy.FOREGROUND,
+        on_event: Callable[[TranslatorEvent], None] | None = None,
     ) -> Chapter:
         novel = self.repo.get_novel(novel_id)
         chapter = self.repo.get_chapter(novel_id, index)
         if not novel or not chapter:
             raise NotFoundError(f"Không có chương {index} của truyện {novel_id}")
-        if chapter.status == ChapterStatus.TRANSLATED and not force:
-            return chapter
+        if chapter.status in (ChapterStatus.TRANSLATED, ChapterStatus.EDITED) and not force:
+            return chapter  # đã có bản dịch: không gọi LLM
 
         # NT_MODEL chỉ áp dụng khi không chỉ định provider; provider khác dùng model mặc định.
         model = model or (self.default_model if provider is None else None)
         translator = ChapterTranslator(
             self.provider_factory(provider, model), self.chapter_char_limit, model=model
         )
+        glossary = self.repo.list_glossary(novel_id)
+        previous = chapter.status
         chapter.status = ChapterStatus.TRANSLATING
         self.repo.update_chapter(chapter)
         try:
             out = translator.translate(
-                novel, self.repo.list_glossary(novel_id), chapter.title, chapter.source_text
+                novel, glossary, chapter.title, chapter.source_text,
+                policy=policy, on_event=on_event,
             )
+        except (DailyQuotaError, RateQuotaError):
+            # Hết quota không phải lỗi của chương: giữ nguyên để dịch lại sau.
+            keep = previous in (ChapterStatus.TRANSLATED, ChapterStatus.EDITED)
+            chapter.status = previous if keep else ChapterStatus.PENDING
+            self.repo.update_chapter(chapter)
+            raise
         except TranslationError:
-            chapter.status = ChapterStatus.FAILED
+            chapter.status = ChapterStatus.FAILED  # không lưu bản dịch dở dang
             self.repo.update_chapter(chapter)
             raise
         chapter.translated_title = out.title
         chapter.translated_text = out.text
         chapter.provider, chapter.model = out.provider, out.model
+        chapter.chain_step = out.chain_step
+        chapter.glossary_version = novel.glossary_version
+        chapter.glossary_outdated = False
+        chapter.possible_omission = out.possible_omission
         chapter.status = ChapterStatus.TRANSLATED
         self.repo.update_chapter(chapter)
+        self._queue_suggestions(novel_id, glossary, out.names)
         return chapter
+
+    def _queue_suggestions(self, novel_id: int, glossary: list[GlossaryEntry],
+                           names: list[NameItem]) -> None:
+        """Đưa tên mới vào hàng chờ duyệt; bỏ qua term đã có trong bộ tên. Term đã có trong
+        hàng chờ (kể cả đã bị bỏ qua) không bị thêm lại (repository ON CONFLICT DO NOTHING)."""
+        known = {g.source_term for g in glossary}
+        for item in names:
+            if item.source in known:
+                continue
+            self.repo.add_suggestion(
+                GlossarySuggestion(novel_id, item.source, item.target, item.category)
+            )
 
     def translate_range(
         self, novel_id: int, start: int, end: int, **kwargs
