@@ -9,12 +9,12 @@
 
 ## 2. Storage: PostgreSQL, migration và schema mới
 
-- [ ] 2.1 Chuẩn bị Postgres local: tạo role + database `ai_novel_translator` và `ai_novel_translator_test` trên container `shared-postgres` (chạy SQL qua `docker exec shared-postgres psql`), ghi `NT_DATABASE_URL` và `NT_TEST_DATABASE_URL` vào `.env`; cập nhật `.env.example` (bỏ `NT_DB_PATH`); kiểm tra kết nối được tới cả hai database bằng một lệnh Python ngắn dùng psycopg
-- [ ] 2.2 Thêm cấu hình `NT_DATABASE_URL`, `NT_DB_POOL_MAX` vào `config.py`; tạo pool `psycopg_pool` trong `container.py`, app thoát với lỗi rõ ràng khi không kết nối được; kiểm tra bằng test khởi tạo container với URL sai báo lỗi có tên biến
-- [ ] 2.3 Viết migration runner (bảng `schema_migrations`, `pg_advisory_lock`, mỗi file một transaction) và `storage/migrations/001_initial.sql` theo bảng schema ở design D6 (kiểu Postgres, CHECK status, FK `ON DELETE CASCADE`); kiểm tra bằng test: database trống lên đúng version, chạy lại lần hai không làm gì, file lỗi được rollback sạch
-- [ ] 2.4 Fixture pytest theo D6 (đọc `NT_TEST_DATABASE_URL`, dừng sớm kèm hướng dẫn nếu thiếu hoặc không kết nối được, dựng schema một lần mỗi phiên, `TRUNCATE ... RESTART IDENTITY CASCADE` sau mỗi test); kiểm tra test migration của 2.3 chạy qua fixture này và database test sạch sau mỗi test
-- [ ] 2.5 Cập nhật entity domain (`Chapter` thêm `glossary_version`, `chain_step`, `glossary_outdated`, `possible_omission`, status `edited`; `GlossarySuggestion`, `ReadingProgress`) và viết `storage/postgres_repo.py` thay cho `sqlite_repo.py` (xóa file SQLite), upsert bằng `ON CONFLICT`; chuyển `tests/conftest.py` sang fixture Postgres của 2.4; kiểm tra 8 test hiện có pass trên Postgres, cộng test các thao tác đọc/ghi mới và test xóa novel làm mất toàn bộ bản ghi con
-- [ ] 2.6 Thêm khi khởi động: chương `translating` đặt về `pending`; kiểm tra bằng test
+- [x] 2.1 Chuẩn bị Postgres local: tạo role + database `ai_novel_translator` và `ai_novel_translator_test` trên container `shared-postgres` (chạy SQL qua `docker exec shared-postgres psql`), ghi `NT_DATABASE_URL` và `NT_TEST_DATABASE_URL` vào `.env`; cập nhật `.env.example` (bỏ `NT_DB_PATH`); kiểm tra kết nối được tới cả hai database bằng một lệnh Python ngắn dùng psycopg
+- [x] 2.2 Thêm cấu hình `NT_DATABASE_URL`, `NT_DB_POOL_MAX` vào `config.py`; tạo pool `psycopg_pool` trong `container.py`, app thoát với lỗi rõ ràng khi không kết nối được; kiểm tra bằng test khởi tạo container với URL sai báo lỗi có tên biến
+- [x] 2.3 Viết migration runner (bảng `schema_migrations`, `pg_advisory_lock`, mỗi file một transaction) và `storage/migrations/001_initial.sql` theo bảng schema ở design D6 (kiểu Postgres, CHECK status, FK `ON DELETE CASCADE`); kiểm tra bằng test: database trống lên đúng version, chạy lại lần hai không làm gì, file lỗi được rollback sạch
+- [x] 2.4 Fixture pytest theo D6 (đọc `NT_TEST_DATABASE_URL`, dừng sớm kèm hướng dẫn nếu thiếu hoặc không kết nối được, dựng schema một lần mỗi phiên, `TRUNCATE ... RESTART IDENTITY CASCADE` sau mỗi test); kiểm tra test migration của 2.3 chạy qua fixture này và database test sạch sau mỗi test
+- [x] 2.5 Cập nhật entity domain (`Chapter` thêm `glossary_version`, `chain_step`, `glossary_outdated`, `possible_omission`, status `edited`; `GlossarySuggestion`, `ReadingProgress`) và viết `storage/postgres_repo.py` thay cho `sqlite_repo.py` (xóa file SQLite), upsert bằng `ON CONFLICT`; chuyển `tests/conftest.py` sang fixture Postgres của 2.4; kiểm tra 8 test hiện có pass trên Postgres, cộng test các thao tác đọc/ghi mới và test xóa novel làm mất toàn bộ bản ghi con
+- [x] 2.6 Thêm khi khởi động: chương `translating` đặt về `pending`; kiểm tra bằng test
 
 ## 3. Lỗi provider, streaming và Gemini
 
