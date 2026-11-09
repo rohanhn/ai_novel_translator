@@ -15,7 +15,7 @@ from . import errors
 from .auth import auth_middleware
 from .auth import router as auth_router
 from .privacy import ROBOTS_TXT, noindex_middleware
-from .routers import chapters, glossary, library, reading, settings
+from .routers import chapters, glossary, library, prefetch, reading, settings
 
 
 @asynccontextmanager
@@ -32,7 +32,7 @@ app.middleware("http")(auth_middleware)
 app.middleware("http")(noindex_middleware)
 errors.install(app)
 for r in (auth_router, library.router, chapters.router, glossary.router, reading.router,
-          settings.router):
+          prefetch.router, settings.router):
     app.include_router(r)
 
 
