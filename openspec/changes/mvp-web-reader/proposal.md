@@ -32,6 +32,7 @@ Kiến trúc v0.1 là công cụ CLI/API dịch bằng LLM, chưa phục vụ đ
 
 **Giao diện và quy ước**
 - **BREAKING:** Web SPA + HTTP API là giao diện chính. CLI chỉ còn là công cụ quản trị/dev, không bắt buộc ngang tính năng.
+- Cả 6 màn web (đăng nhập, thư viện, danh sách chương, reader, bộ tên, cài đặt) dùng chung phong cách tiên hiệp "Thủy mặc · Chu sa": nền giấy, mực tàu, ấn son, ngọc bích, chữ Hán thư pháp. Tên khu vực mang hơi hướng tu tiên luôn đi kèm nhãn rõ nghĩa; trạng thái và lỗi ghi thẳng. Mockup tham chiếu: https://claude.ai/artifact/9L5YJPQnkHCwMMYxtM34vn (các artboard "Tiên hiệp · …").
 - Cập nhật `openspec/config.yaml`:
   - Bỏ ràng buộc "CLI và API phải ngang tính năng".
   - Đổi provider mặc định sang Gemini và áp dụng mô hình một request mỗi chương.
@@ -74,6 +75,6 @@ Kiến trúc v0.1 là công cụ CLI/API dịch bằng LLM, chưa phục vụ đ
 - **API:** thêm endpoint auth, streaming dịch, tiến độ, bộ tên đề xuất, sửa bản dịch, xóa truyện, trạng thái quota. Mọi endpoint (trừ login, health) yêu cầu session.
 - **CLI:** giữ lại cho import/quản trị/debug, không mở rộng thêm.
 - **Chi phí LLM:** $0 với Gemini free tier. Số request mỗi chương giảm từ khoảng 4 xuống 1. Buffer N+1 tiêu tối đa thêm một chương mỗi lần bỏ ngang và không bao giờ dùng quota dự phòng. Đánh đổi đã chấp nhận: ở free tier, Google có thể dùng dữ liệu gửi lên.
-- **Dependencies:** Python: SDK Gemini (`google-genai`), thư viện hash mật khẩu, driver PostgreSQL (`psycopg` 3 kèm pool). Frontend: Node (chỉ lúc build), Svelte, Vite. Docker image multi-stage.
+- **Dependencies:** Python: SDK Gemini (`google-genai`), thư viện hash mật khẩu, driver PostgreSQL (`psycopg` 3 kèm pool). Frontend: Node (chỉ lúc build), Svelte, Vite, font tự host qua các gói `@fontsource/*` (không gọi Google Fonts CDN lúc chạy). Docker image multi-stage.
 - **Vận hành:** một container app trên VPS sau reverse proxy HTTPS có sẵn, nối vào Docker network của container PostgreSQL dùng chung. Database và role của app được tạo thủ công một lần. Sao lưu bằng `pg_dump`.
 - **Phát triển:** test cần PostgreSQL local đang chạy, dùng một database test riêng.

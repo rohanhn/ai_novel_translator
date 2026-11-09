@@ -183,6 +183,44 @@ Thêm các biến:
 
 `NT_MAX_SEGMENT_CHARS` được thay bằng `NT_CHAPTER_CHAR_LIMIT`. Cấu hình database xem D6. Riêng `NT_PROVIDER`/`NT_MODEL` vẫn dùng cho CLI override.
 
+### D11. Ngôn ngữ giao diện "Thủy mặc · Chu sa"
+
+Cả 6 màn dùng chung một phong cách tiên hiệp. Mockup tham chiếu: https://claude.ai/artifact/9L5YJPQnkHCwMMYxtM34vn (chỉ các artboard "Tiên hiệp · …"; hai hàng bản trung tính phía trên là phương án cũ, không dùng).
+
+**Token** (CSS custom properties trong `web/src/lib/styles/theme.css`, component chỉ dùng biến, không viết mã màu trực tiếp):
+
+| Token | Giá trị | Dùng cho |
+|---|---|---|
+| `--paper` / `--paper-raised` | `#F3EDE0` / `#FAF6EC` | nền trang / khung cuộn thư |
+| `--ink` / `--ink-muted` | `#1E1B16` / `#5E5648` | chữ chính / chữ phụ |
+| `--cinnabar` | `#9E2B1E` | nút chính, ấn chương, thao tác nguy hiểm |
+| `--jade` | `#2F6B57` | trạng thái đã dịch, tiến độ |
+| `--bronze` | `#8C6A2A` | viền trang trí, đường mây (không dùng cho chữ nhỏ) |
+| `--line` | `#D9CDB4` | đường kẻ, viền khung |
+
+**Chữ:** Ma Shan Zheng cho chữ Hán ở tiêu đề, con dấu và bìa (không dùng cho chữ Việt vì font không có dấu tiếng Việt); Cormorant Garamond cho tiêu đề tiếng Việt; Noto Serif / Noto Serif SC cho nội dung chương; Be Vietnam Pro cho chữ giao diện nhỏ.
+
+**Font tự host:** cài qua `@fontsource/*` và đóng gói vào `web/build`. App là private + `noindex`, nên không gửi request tới bên thứ ba lúc chạy. Font CJK được `@fontsource` tách theo `unicode-range` nên trình duyệt chỉ tải phần chữ đang hiển thị; mọi `@font-face` dùng `font-display: swap`.
+
+**Quy ước nhãn:** tên khu vực kiểu tu tiên luôn có nhãn rõ nghĩa đi kèm (Tàng Thư Các · Thư viện, Danh Lục · Bộ tên, Tu vi · tiến độ dịch, Pháp khí · chuỗi model, Thiết lập · Cài đặt). Trạng thái chương, thông báo lỗi, quota và hộp xác nhận luôn dùng từ ngữ thường (Đã dịch, Lỗi, Hết lượt hôm nay…), không đổi sang từ tu tiên.
+
+**Theme đọc** (giá trị lưu server-side theo spec `web-reader`): `light` = Tuyên chỉ, `sepia` = Hoàng quyển, `dark` = Dạ nguyệt; thêm `bamboo` = Trúc lâm. Mỗi theme định nghĩa lại bộ token trên, chữ thân bài đạt tương phản ≥4.5:1.
+
+**Component dùng chung** (`web/src/lib/components/`): `Seal` (ấn son vuông chứa 1–2 chữ Hán), `ScrollFrame` (khung viền kép như cuộn thư), `JadeTablet` (thẻ thuật ngữ), `StatusChip` (nhãn trạng thái chương, chữ thường + màu), `InkMountains` (SVG núi thủy mặc, `aria-hidden`, chỉ trang trí). Không dùng emoji; icon là SVG nét.
+
+**Ánh xạ route → artboard mockup:**
+
+| Route | Artboard |
+|---|---|
+| `/login` | Tiên hiệp · Đăng nhập |
+| `/` | Tiên hiệp · Tàng Thư Các; Tiên hiệp · Upload TXT |
+| `/novels/[id]` | Tiên hiệp · Chi tiết truyện & mục lục |
+| `/novels/[id]/chapters/[n]` | Tiên hiệp · Reader (mobile); Tiên hiệp · Reader trạng thái dịch (mobile); Tiên hiệp · Reader desktop & biên tập |
+| `/novels/[id]/glossary` | Tiên hiệp · Danh Lục |
+| `/settings` | Tiên hiệp · Thiết lập |
+
+Mockup là tham chiếu bố cục và phong cách; hành vi lấy theo spec. Khi mockup và spec lệch nhau, spec thắng.
+
 ### Các lớp bị thay đổi
 
 | Lớp | Thay đổi |
@@ -195,7 +233,7 @@ Thêm các biến:
 | `config.py` | thêm `NT_DATABASE_URL`, `NT_DB_POOL_MAX`; bỏ `NT_DB_PATH` |
 | `interfaces/api` | auth middleware, router tách theo nhóm, SSE, phục vụ SPA |
 | `interfaces/cli` | `hash-password`; `translate` dùng chuỗi |
-| mới: `web/` | SvelteKit SPA |
+| mới: `web/` | SvelteKit SPA; theme "Thủy mặc · Chu sa" (token, font tự host, component dùng chung, xem D11) |
 | deploy | `Dockerfile` multi-stage, `docker-compose.yml` mẫu, ghi chú reverse proxy |
 
 ## Risks / Trade-offs
@@ -207,6 +245,9 @@ Thêm các biến:
 - **[Chạy nhiều worker uvicorn sẽ phá job registry]** → Dockerfile cố định `--workers 1`; ghi rõ trong tài liệu.
 - **[Thay tên nhầm trong tiếng Việt]** (ví dụ "Tô Nhu" nằm trong "Tô Nhuận") → Có kiểm tra ranh giới từ và chỉ chạy trên chương có raw chứa term. Nhãn glossary-outdated luôn được gắn, nên user có đường dịch lại.
 - **[Free tier: Google có thể dùng dữ liệu]** → Đánh đổi đã chấp nhận trong proposal. Ghi chú trong màn hình cài đặt.
+- **[Font CJK nặng làm chậm lần tải đầu trên điện thoại]** → Chỉ dùng Ma Shan Zheng cho vài chữ Hán ở tiêu đề/ấn; font được tách theo `unicode-range` và `font-display: swap`, nên nội dung chương hiển thị ngay bằng font dự phòng.
+- **[Tên kiểu tu tiên gây khó hiểu]** → Quy ước nhãn ở D11: luôn kèm nhãn rõ nghĩa; trạng thái và lỗi không bao giờ dùng từ tu tiên.
+- **[Tương phản thấp ở theme tối hoặc chữ vàng đồng]** → `--bronze` chỉ dùng cho trang trí; mỗi theme được kiểm tra tương phản ≥4.5:1 trong task nền tảng giao diện.
 - **[Token stream đến trình duyệt bị proxy buffer]** → Header `X-Accel-Buffering`; ghi chú cấu hình Nginx/Caddy.
 - **[Instance Postgres dùng chung hết kết nối hoặc bị app khác làm chậm]** → Pool tối đa 5 kết nối; dùng role và database riêng nên app không đụng dữ liệu app khác. Postgres không kết nối được lúc khởi động thì app thoát với lỗi rõ ràng.
 - **[Test phụ thuộc Postgres local đang chạy]** → Đã chấp nhận. Thiếu `NT_TEST_DATABASE_URL` hoặc không kết nối được thì pytest dừng sớm với thông báo hướng dẫn, thay vì hàng loạt test lỗi khó hiểu. Database test tách riêng nên không bao giờ xóa nhầm dữ liệu thật.

@@ -59,20 +59,21 @@
 ## 9. Frontend SvelteKit
 
 - [ ] 9.1 Khởi tạo `web/` (SvelteKit, `adapter-static`, `ssr=false`, fallback `index.html`), API client có cookie + `X-Requested-With`, tự chuyển sang `/login` khi gặp 401; FastAPI phục vụ `web/build` ở `/` với fallback deep link; kiểm tra `npm run build` thành công và test spec "Deep link"
-- [ ] 9.2 Trang đăng nhập và thư viện (danh sách theo lần đọc gần nhất, upload `.txt` có báo lỗi kích thước, xóa có hộp xác nhận); kiểm tra thủ công trên viewport 360px và 1280px
-- [ ] 9.3 Trang danh sách chương với nhãn trạng thái (pending/translating/translated/edited/failed/glossary-outdated/fallback/possible-omission) và nút đọc tiếp; kiểm tra thủ công với dữ liệu mẫu
-- [ ] 9.4 Reader: hiển thị bản đã lưu; tự dịch kèm streaming qua SSE (gắn vào job đang chạy); thông báo hết quota có giờ reset; lỗi kèm nút thử lại; chuyển chương trước/sau; xem bản gốc; nhãn nguồn gốc bản dịch; kiểm tra thủ công với provider `echo` có độ trễ
-- [ ] 9.5 Reader: đếm tín hiệu đọc (30 giây chương hiển thị, tạm dừng khi tab ẩn; cuộn ≥60%; nút "chuẩn bị chương tiếp") gửi một lần mỗi chương; lưu tiến độ debounce 5 giây + `sendBeacon` khi `pagehide`; khôi phục vị trí khi mở truyện; kiểm tra thủ công: đọc 30 giây làm chương N+1 chuyển sang translated
-- [ ] 9.6 Chế độ biên tập trong reader (sửa tiêu đề/nội dung, lưu, xác nhận khi dịch lại chương đã sửa); kiểm tra thủ công
-- [ ] 9.7 Trang bộ tên: danh sách term, sửa/xóa (cảnh báo số chương bị ảnh hưởng), hàng chờ đề xuất có nút đồng ý / sửa / bỏ qua; kiểm tra thủ công một lần đổi tên lan sang chương đã dịch
-- [ ] 9.8 Trang cài đặt: theme (sáng/sepia/tối), cỡ chữ, giãn dòng (lưu server-side), công tắc prefetch, bảng lượt dùng và trạng thái quota theo từng bước, ghi chú về dữ liệu ở free tier, nút đăng xuất; kiểm tra thủ công rằng tùy chọn áp dụng trên trình duyệt khác
-- [ ] 9.9 Kiểm tra mobile-first: không có thanh cuộn ngang ở 360px, vùng chạm của điều hướng ≥44px; kiểm tra bằng DevTools device mode
+- [ ] 9.2 Nền tảng giao diện theo D11: `theme.css` (token + 4 theme đọc Tuyên chỉ/Hoàng quyển/Dạ nguyệt/Trúc lâm), font tự host qua `@fontsource` (`font-display: swap`), component `Seal`, `ScrollFrame`, `JadeTablet`, `StatusChip`, `InkMountains`, layout chung (thanh điều hướng có nhãn tu tiên + nhãn rõ nghĩa); kiểm tra `npm run build` không có request font ra ngoài (DevTools Network) và tương phản chữ thân bài ≥4.5:1 trên cả 4 theme
+- [ ] 9.3 Trang đăng nhập và thư viện (danh sách theo lần đọc gần nhất, upload `.txt` có báo lỗi kích thước, xóa có hộp xác nhận) theo artboard "Tiên hiệp · Đăng nhập", "Tiên hiệp · Tàng Thư Các", "Tiên hiệp · Upload TXT"; kiểm tra thủ công trên viewport 360px và 1280px
+- [ ] 9.4 Trang danh sách chương với nhãn trạng thái (pending/translating/translated/edited/failed/glossary-outdated/fallback/possible-omission, hiển thị bằng chữ thường qua `StatusChip`) và nút đọc tiếp, theo artboard "Tiên hiệp · Chi tiết truyện & mục lục"; kiểm tra thủ công với dữ liệu mẫu
+- [ ] 9.5 Reader: hiển thị bản đã lưu; tự dịch kèm streaming qua SSE (gắn vào job đang chạy); thông báo hết quota có giờ reset; lỗi kèm nút thử lại; chuyển chương trước/sau; xem bản gốc; nhãn nguồn gốc bản dịch; theo artboard "Tiên hiệp · Reader" và "Tiên hiệp · Reader trạng thái dịch"; kiểm tra thủ công với provider `echo` có độ trễ
+- [ ] 9.6 Reader: đếm tín hiệu đọc (30 giây chương hiển thị, tạm dừng khi tab ẩn; cuộn ≥60%; nút "chuẩn bị chương tiếp") gửi một lần mỗi chương; lưu tiến độ debounce 5 giây + `sendBeacon` khi `pagehide`; khôi phục vị trí khi mở truyện; kiểm tra thủ công: đọc 30 giây làm chương N+1 chuyển sang translated
+- [ ] 9.7 Chế độ biên tập trong reader (sửa tiêu đề/nội dung, lưu, xác nhận khi dịch lại chương đã sửa) theo artboard "Tiên hiệp · Reader desktop & biên tập"; kiểm tra thủ công
+- [ ] 9.8 Trang bộ tên: danh sách term dạng `JadeTablet`, sửa/xóa (cảnh báo số chương bị ảnh hưởng), hàng chờ đề xuất có nút đồng ý / sửa / bỏ qua, theo artboard "Tiên hiệp · Danh Lục"; kiểm tra thủ công một lần đổi tên lan sang chương đã dịch
+- [ ] 9.9 Trang cài đặt: theme (Tuyên chỉ/Hoàng quyển/Dạ nguyệt/Trúc lâm), cỡ chữ, giãn dòng (lưu server-side), công tắc prefetch, bảng lượt dùng và trạng thái quota theo từng bước, ghi chú về dữ liệu ở free tier, nút đăng xuất, theo artboard "Tiên hiệp · Thiết lập"; kiểm tra thủ công rằng tùy chọn áp dụng trên trình duyệt khác
+- [ ] 9.10 Kiểm tra mobile-first và nhãn: không có thanh cuộn ngang ở 360px, vùng chạm của điều hướng ≥44px, mọi nhãn tu tiên có nhãn rõ nghĩa đi kèm (spec "Plain-language labels"); kiểm tra bằng DevTools device mode
 
 ## 10. Đóng gói và triển khai
 
 - [ ] 10.1 `Dockerfile` multi-stage (Node build `web/` → Python 3.14 slim, cùng phiên bản với môi trường dev; uvicorn `--workers 1`; không cần volume dữ liệu) và `docker-compose.yml` mẫu nối vào Docker network `external` của `shared-postgres` (tên network và host lấy từ biến); kiểm tra `docker build` thành công và container trả `/health` OK khi chạy cùng `shared-postgres` local
 - [ ] 10.2 Viết `docs/DEPLOY.md`: lệnh SQL tạo role + database, biến môi trường, tạo hash mật khẩu, cách tìm tên network của `shared-postgres`, cấu hình reverse proxy cho subdomain (Nginx và Caddy, tắt buffering cho SSE), sao lưu bằng `pg_dump -Fc` và rollback bằng `pg_restore`; kiểm tra bằng cách làm theo tài liệu trên máy local với docker compose
-- [ ] 10.3 Cập nhật `docs/ARCHITECTURE.md` (sơ đồ có web/SSE/job manager/chain, bảng lớp, backlog mới) và `CLAUDE.md` (lệnh build web, env mới); kiểm tra các lệnh ghi trong tài liệu chạy được
+- [ ] 10.3 Cập nhật `docs/ARCHITECTURE.md` (sơ đồ có web/SSE/job manager/chain, bảng lớp, backlog mới, mục ngôn ngữ giao diện tóm tắt D11 kèm link mockup) và `CLAUDE.md` (lệnh build web, env mới); kiểm tra các lệnh ghi trong tài liệu chạy được
 
 ## 11. Kiểm tra tích hợp
 
