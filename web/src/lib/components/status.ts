@@ -27,11 +27,17 @@ export type ChapterFlags = {
 	glossary_outdated?: boolean;
 	possible_omission?: boolean;
 	chain_step?: number | null;
+	job_lane?: string | null;
 };
 
 /** Các nhãn cần hiện cho một chương (trạng thái chính + cờ phụ). */
 export function chipsFor(ch: ChapterFlags): ChipKind[] {
-	const kinds: ChipKind[] = [(ch.status in CHIP_LABELS ? ch.status : 'pending') as ChipKind];
+	let main = (ch.status in CHIP_LABELS ? ch.status : 'pending') as ChipKind;
+	// Có job đang chờ/chạy cho chương chưa có bản dịch: hiện là đang dịch.
+	if (ch.job_lane && (main === 'pending' || main === 'failed' || main === 'translating')) {
+		main = ch.job_lane === 'background' ? 'prefetching' : 'translating';
+	}
+	const kinds: ChipKind[] = [main];
 	if (ch.chain_step != null && ch.chain_step > 1) kinds.push('fallback');
 	if (ch.glossary_outdated) kinds.push('glossary_outdated');
 	if (ch.possible_omission) kinds.push('possible_omission');

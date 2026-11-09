@@ -53,6 +53,18 @@ def seed(c, tmp: Path) -> None:
     for i in (1, 2, 3, 4):
         c.translation.translate_chapter(a, i)
     c.editing.edit_chapter(a, 3, "Tổ thạch", "Bản biên tập tay của chương 3.")
+    from novel_translator.domain.models import ChapterStatus
+
+    def patch(index: int, **fields) -> None:
+        ch = c.repo.get_chapter(a, index)
+        for k, v in fields.items():
+            setattr(ch, k, v)
+        c.repo.update_chapter(ch)
+
+    patch(2, chain_step=2, model="gemini-3.5-flash-lite")  # model dự phòng
+    patch(3, glossary_outdated=True)  # đã biên tập + bộ tên đã đổi
+    patch(4, possible_omission=True)
+    patch(5, status=ChapterStatus.FAILED)
     c.glossary.set_term(a, "林动", "Lâm Động", "nhân vật chính")
     c.repo.add_suggestion(GlossarySuggestion(a, "苏柔", "Tô Nhu", "person"))
     c.repo.add_suggestion(GlossarySuggestion(a, "青阳镇", "Thanh Dương trấn", "place"))

@@ -15,8 +15,9 @@
 		position: relative;
 		display: flex;
 		justify-content: center;
-		padding: 22px 16px 52px;
+		padding: 18px 12px 52px;
 		background: var(--c);
+		container-type: inline-size;
 		box-shadow:
 			inset 0 0 0 5px var(--c),
 			inset 0 0 0 6px var(--bronze),
@@ -26,11 +27,13 @@
 	.title {
 		align-self: flex-start;
 		max-width: 100%;
-		padding: 12px 10px;
+		max-height: 100%;
+		overflow: hidden;
+		padding: 10px 8px;
 		border: 1px solid color-mix(in srgb, var(--on-cover) 35%, transparent);
 		color: var(--on-cover);
 		font-family: var(--font-title);
-		font-size: 22px;
+		font-size: clamp(14px, 13cqi, 22px);
 		font-weight: 700;
 		line-height: 1.15;
 		text-align: center;

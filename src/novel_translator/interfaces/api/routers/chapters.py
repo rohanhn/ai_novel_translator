@@ -17,14 +17,20 @@ from ..schemas import ChapterEditIn, ChapterOut, ChapterSummary, TranslateAccept
 router = APIRouter(prefix="/api/novels/{novel_id}/chapters", tags=["chapters"])
 
 
+def _lane(c: Container, novel_id: int, index: int) -> str | None:
+    job = c.jobs.get(novel_id, index)
+    return job.lane.value if job else None
+
+
 @router.get("", response_model=list[ChapterSummary])
 def list_chapters(novel_id: int, c: Container = Depends(get_container)):
-    return [ChapterSummary.of(ch) for ch in c.library.list_chapters(novel_id)]
+    return [ChapterSummary.of(ch, _lane(c, novel_id, ch.index))
+            for ch in c.library.list_chapters(novel_id)]
 
 
 @router.get("/{index}", response_model=ChapterOut)
 def get_chapter(novel_id: int, index: int, c: Container = Depends(get_container)):
-    return ChapterOut.of(c.library.get_chapter(novel_id, index))
+    return ChapterOut.of(c.library.get_chapter(novel_id, index), _lane(c, novel_id, index))
 
 
 @router.put("/{index}", response_model=ChapterOut)

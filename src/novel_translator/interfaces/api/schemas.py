@@ -50,12 +50,15 @@ class ChapterSummary(BaseModel):
     status: str
     glossary_outdated: bool
     possible_omission: bool
+    chain_step: int | None  # >1: dịch bằng model dự phòng
+    job_lane: str | None = None  # có job đang chờ/chạy: foreground | background (prefetch)
 
     @classmethod
-    def of(cls, c: Chapter) -> ChapterSummary:
+    def of(cls, c: Chapter, job_lane: str | None = None) -> ChapterSummary:
         return cls(index=c.index, title=c.title, translated_title=c.translated_title,
                    status=c.status.value, glossary_outdated=c.glossary_outdated,
-                   possible_omission=c.possible_omission)
+                   possible_omission=c.possible_omission, chain_step=c.chain_step,
+                   job_lane=job_lane)
 
 
 class ChapterOut(ChapterSummary):
@@ -63,14 +66,13 @@ class ChapterOut(ChapterSummary):
     translated_text: str | None
     provider: str | None
     model: str | None
-    chain_step: int | None
     glossary_version: int | None
 
     @classmethod
-    def of(cls, c: Chapter) -> ChapterOut:
-        return cls(**ChapterSummary.of(c).model_dump(), source_text=c.source_text,
+    def of(cls, c: Chapter, job_lane: str | None = None) -> ChapterOut:
+        return cls(**ChapterSummary.of(c, job_lane).model_dump(), source_text=c.source_text,
                    translated_text=c.translated_text, provider=c.provider, model=c.model,
-                   chain_step=c.chain_step, glossary_version=c.glossary_version)
+                   glossary_version=c.glossary_version)
 
 
 class ChapterEditIn(BaseModel):

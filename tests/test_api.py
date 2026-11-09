@@ -244,3 +244,30 @@ def test_settings_never_exposes_keys(chain_client, monkeypatch):
     assert body["gemini_key_configured"] is True
     assert "echo" in body["available_providers"]
     assert "khoa-bi-mat-123" not in r.text
+
+
+def test_chapter_summary_reports_fallback_step_and_job_lane(api_client, container):
+    nid = _upload(api_client)
+    api_client.post(f"/api/novels/{nid}/chapters/1/translate", json={})
+    _wait_status(api_client, nid, 1, "translated")
+    rows = api_client.get(f"/api/novels/{nid}/chapters").json()
+    assert rows[0]["chain_step"] is None and rows[0]["job_lane"] is None  # echo không qua chuỗi
+    import threading
+
+    from novel_translator.application.jobs import Lane
+
+    gate = threading.Event()
+    real = container.translation.translate_chapter
+
+    def slow(*a, **kw):
+        assert gate.wait(5)
+        return real(*a, **kw)
+
+    container.translation.translate_chapter = slow
+    try:
+        container.jobs.submit(nid, 2, Lane.BACKGROUND)
+        assert api_client.get(f"/api/novels/{nid}/chapters").json()[1]["job_lane"] == "background"
+    finally:
+        gate.set()
+        _wait_status(api_client, nid, 2, "translated")
+        container.jobs.shutdown()

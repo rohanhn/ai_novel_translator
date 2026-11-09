@@ -18,6 +18,8 @@ export type ChapterSummary = {
 	status: 'pending' | 'translating' | 'translated' | 'edited' | 'failed';
 	glossary_outdated: boolean;
 	possible_omission: boolean;
+	chain_step: number | null;
+	job_lane: 'foreground' | 'background' | null;
 };
 
 export type Chapter = ChapterSummary & {
@@ -25,7 +27,6 @@ export type Chapter = ChapterSummary & {
 	translated_text: string | null;
 	provider: string | null;
 	model: string | null;
-	chain_step: number | null;
 	glossary_version: number | null;
 };
 
