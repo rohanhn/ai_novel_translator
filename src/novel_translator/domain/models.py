@@ -85,6 +85,28 @@ class ReadingProgress:
     updated_at: datetime = field(default_factory=_now)
 
 
+class ChainPolicy(str, Enum):
+    """FOREGROUND: chương chủ sở hữu mở, dùng mọi bước. BACKGROUND: prefetch, chỉ bước 1."""
+
+    FOREGROUND = "foreground"
+    BACKGROUND = "background"
+
+
+@dataclass(frozen=True)
+class ChainEvent:
+    """Sự kiện tiến trình của chuỗi provider.
+
+    kind: `waiting_for_quota` (đang chờ vì giới hạn tốc độ, `delay` giây) |
+          `fallback_step` (đang dùng bước dự phòng `step` > 1).
+    """
+
+    kind: str
+    step: int
+    provider: str
+    model: str
+    delay: float | None = None
+
+
 @dataclass(frozen=True)
 class StepUsage:
     """Lượt dùng trong ngày của một bước trong chuỗi provider."""
