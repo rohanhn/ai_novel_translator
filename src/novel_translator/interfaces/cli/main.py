@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import typer
 
 from ...application.services import NotFoundError
 from ...container import Container, DatabaseConfigError, get_container
-from ...domain.ports import TranslationError
+from ...domain.models import ChainEvent
+from ...domain.ports import DailyQuotaError, TranslationError
 
 app = typer.Typer(help="Dịch truyện Trung → Việt bằng LLM.", no_args_is_help=True)
 glossary_app = typer.Typer(help="Quản lý bảng thuật ngữ của truyện.", no_args_is_help=True)
@@ -61,14 +63,34 @@ def translate(
     model: str | None = typer.Option(None, "--model", "-m"),
     force: bool = typer.Option(False, help="Dịch lại cả chương đã dịch"),
 ):
-    """Dịch một hoặc nhiều chương."""
+    """Dịch một hoặc nhiều chương qua chuỗi provider (hoặc --provider/--model để override)."""
     svc = _c().translation
     for i in range(start, (end or start) + 1):
         try:
-            ch = svc.translate_chapter(novel_id, i, provider=provider, model=model, force=force)
-            typer.echo(f"✓ Chương {i}: {ch.translated_title} ({ch.provider}/{ch.model})")
+            ch = svc.translate_chapter(novel_id, i, provider=provider, model=model, force=force,
+                                       on_event=_print_chain_event)
+        except DailyQuotaError as e:
+            when = f" Reset lúc {_local(e.reset_at)}." if e.reset_at else ""
+            _fail(f"✗ Chương {i}: hết lượt hôm nay ở mọi bước của chuỗi.{when}")
         except (NotFoundError, TranslationError, ValueError) as e:
             _fail(f"✗ Chương {i}: {e}")
+        notes = []
+        if ch.chain_step and ch.chain_step > 1:
+            notes.append(f"bước dự phòng {ch.chain_step}")
+        if ch.possible_omission:
+            notes.append("có thể sót đoạn")
+        extra = f" [{', '.join(notes)}]" if notes else ""
+        typer.echo(f"✓ Chương {i}: {ch.translated_title} ({ch.provider}/{ch.model}){extra}")
+
+
+def _local(dt: datetime) -> str:
+    return dt.astimezone().strftime("%Y-%m-%d %H:%M %Z")
+
+
+def _print_chain_event(ev) -> None:
+    if isinstance(ev, ChainEvent) and ev.kind == "waiting_for_quota":
+        typer.secho(f"… {ev.model}: giới hạn tốc độ, chờ {ev.delay:.0f}s rồi thử lại",
+                    fg=typer.colors.YELLOW, err=True)
 
 
 @app.command("show")

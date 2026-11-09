@@ -34,7 +34,7 @@
 - [x] 5.1 Viết prompt 3 phần (`<<TITLE>>`/`<<BODY>>`/`<<NAMES>>`, có ví dụ ngắn, glossary trong phần hướng dẫn cố định) và `SectionParser` streaming; kiểm tra bằng unit test với input bị cắt ở mọi vị trí, thiếu NAMES, thiếu BODY
 - [x] 5.2 Viết lại `ChapterTranslator` thành dạng phát sự kiện, cắt đoạn chỉ khi vượt `NT_CHAPTER_CHAR_LIMIT` (tiêu đề đi cùng đoạn đầu), kiểm tra độ đầy đủ (rỗng, truncated → lỗi; lệch >20% số đoạn → cờ `possible_omission`); kiểm tra bằng test các scenario spec `translation-pipeline`
 - [x] 5.3 Cập nhật `TranslationService`: lưu `glossary_version`, `chain_step`; quota hết thì để `pending`; không dịch lại chương `translated`/`edited` khi không có `force`; đưa tên đề xuất vào hàng chờ (bỏ qua term đã có hoặc đã bị dismiss); kiểm tra bằng test với provider `echo`
-- [ ] 5.4 Cập nhật CLI `translate` theo chuỗi mới và cập nhật test CLI/API hiện có; kiểm tra toàn bộ `pytest -q` pass
+- [x] 5.4 Cập nhật CLI `translate` theo chuỗi mới và cập nhật test CLI/API hiện có; kiểm tra toàn bộ `pytest -q` pass
 
 ## 6. Job manager và prefetch
 

@@ -12,7 +12,11 @@ def test_api_flow(api_client):
 
     r = api_client.post(f"/novels/{nid}/chapters/1/translate", json={})
     assert r.status_code == 200
-    assert r.json()["status"] == "translated"
+    body = r.json()
+    assert body["status"] == "translated"
+    assert body["translated_title"] == "[VI] 第一章 少年"
+    assert body["translated_text"] == "[VI] 林动站在山上。"
+    assert body["provider"] == "echo"
 
 
 def test_api_404(api_client):
