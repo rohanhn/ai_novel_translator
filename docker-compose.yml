@@ -8,13 +8,14 @@
 #   NT_DB_USER, NT_DB_NAME, NT_DB_PORT   mặc định ai_novel_translator / ai_novel_translator / 5432
 #   NT_PASSWORD_HASH hash argon2 của mật khẩu đăng nhập (bắt buộc)
 #   NT_BIND         địa chỉ:cổng publish trên host cho reverse proxy (mặc định 127.0.0.1:8000)
+#   NT_IMAGE_TAG    tag image chạy (mặc định latest; đặt tag cũ để rollback)
 
 name: novel-translator
 
 services:
   app:
     build: .
-    image: novel-translator:latest
+    image: novel-translator:${NT_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
       - path: .env

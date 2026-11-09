@@ -99,7 +99,7 @@ Provider chỉ việc phân loại lỗi thành `RefusalError`, `TruncatedError`
 
 ### D5. SSE từ FastAPI
 
-- `GET /api/chapters/{id}/stream` trả về `StreamingResponse` với `text/event-stream`, đọc từ queue của subscriber.
+- `GET /api/novels/{id}/chapters/{n}/stream` trả về `StreamingResponse` với `text/event-stream`, đọc từ queue của subscriber.
 - Gửi header `X-Accel-Buffering: no` và `Cache-Control: no-cache`, kèm comment keep-alive mỗi 15 giây.
 - Reverse proxy cần tắt buffering cho đường dẫn này; ghi chú trong tài liệu triển khai.
 - Endpoint `POST .../translate` tạo job hoặc gắn vào job có sẵn, và trả ngay `202` cùng URL stream.
@@ -267,7 +267,7 @@ Mockup là tham chiếu bố cục và phong cách; hành vi lấy theo spec. Kh
 1. Tạo role và database `ai_novel_translator` trên `shared-postgres` (lệnh SQL ghi trong `docs/DEPLOY.md`). Dữ liệu SQLite v0.1 không được chuyển.
 2. Cấu hình env: `NT_DATABASE_URL`, `GEMINI_API_KEY`, `NT_PASSWORD_HASH`, `NT_CHAIN`, `NT_TRUSTED_PROXY`.
 3. Khởi động container app trong network của `shared-postgres`; migration runner tự áp dụng `001`.
-4. Thêm khối subdomain vào reverse proxy, tắt buffering cho `/api/chapters/*/stream`.
+4. Thêm khối subdomain vào reverse proxy, tắt buffering cho `/api/novels/*/chapters/*/stream`.
 5. **Sao lưu:** `pg_dump -Fc ai_novel_translator` chạy định kỳ, chỉ database của app.
 6. **Rollback:** dừng container mới, `pg_restore` bản sao lưu vào database của app, chạy lại image cũ.
 
