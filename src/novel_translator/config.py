@@ -38,8 +38,9 @@ class Settings(BaseSettings):
     # Chuỗi fallback mặc định cho bản dịch (design D2/D10). Một key cho mỗi provider: cấu hình
     # không cho phép gán key khác nhau theo bước (spec "No quota circumvention").
     chain: str = DEFAULT_CHAIN
-    # Override cho CLI/dev: chọn provider/model cụ thể, bỏ qua chuỗi.
-    provider: str = "gemini"
+    # Override cho CLI/dev: NT_PROVIDER bỏ qua chuỗi và dùng thẳng provider đó; NT_MODEL dùng
+    # model đó (với provider của bước 1 nếu không đặt NT_PROVIDER). Để trống = dùng chuỗi.
+    provider: str | None = None
     model: str | None = None
 
     gemini_api_key: SecretStr | None = Field(default=None, validation_alias="GEMINI_API_KEY")

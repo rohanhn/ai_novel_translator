@@ -69,7 +69,7 @@ class TranslationService:
     def __init__(
         self,
         repo: NovelRepository,
-        provider_factory: Callable[[str | None], LLMProvider],
+        provider_factory: Callable[[str | None, str | None], LLMProvider],
         max_segment_chars: int,
         default_model: str | None = None,
     ):
@@ -93,11 +93,10 @@ class TranslationService:
         if chapter.status == ChapterStatus.TRANSLATED and not force:
             return chapter
 
+        # NT_MODEL chỉ áp dụng khi không chỉ định provider; provider khác dùng model mặc định.
+        model = model or (self.default_model if provider is None else None)
         translator = ChapterTranslator(
-            self.provider_factory(provider),
-            self.max_segment_chars,
-            # NT_MODEL chỉ áp dụng cho provider mặc định; provider khác dùng model mặc định của nó.
-            model=model or (self.default_model if provider is None else None),
+            self.provider_factory(provider, model), self.max_segment_chars, model=model
         )
         chapter.status = ChapterStatus.TRANSLATING
         self.repo.update_chapter(chapter)

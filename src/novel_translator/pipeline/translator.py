@@ -29,6 +29,7 @@ class ChapterTranslator:
     ) -> TranslationOutput:
         system = build_system_prompt(novel, glossary)
         used_model = self.model or self.provider.default_model
+        used_provider = self.provider.name
 
         title_result = self.provider.complete(
             CompletionRequest(system=system, user=title, model=self.model, max_output_tokens=1000)
@@ -39,11 +40,11 @@ class ChapterTranslator:
                 CompletionRequest(system=system, user=seg, model=self.model)
             )
             parts.append(result.text.strip())
-            used_model = result.model
+            used_provider, used_model = result.provider, result.model
 
         return TranslationOutput(
             title=title_result.text.strip(),
             text="\n".join(parts),
-            provider=self.provider.name,
+            provider=used_provider,
             model=used_model,
         )

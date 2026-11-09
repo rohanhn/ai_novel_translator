@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import atexit
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -14,9 +15,11 @@ from .domain.ports import LLMProvider
 from .export.txt_exporter import TxtExporter
 from .ingest.txt_loader import TxtLoader
 from .providers import create_provider
+from .providers.chain import ChainLink, ChainProvider
 from .storage.db import DatabaseConfigError, create_pool
 from .storage.migrator import migrate
 from .storage.postgres_repo import PostgresRepository
+from .storage.quota_repo import PostgresQuotaTracker
 
 
 @dataclass
@@ -27,6 +30,8 @@ class Container:
     translation: TranslationService
     exports: ExportService
     repo: PostgresRepository
+    quota: PostgresQuotaTracker
+    provider_factory: Callable[[str | None, str | None], LLMProvider]
     pool: ConnectionPool
 
     def close(self) -> None:
@@ -47,13 +52,34 @@ def build_container(
     migrate(pool)
     repo = PostgresRepository(pool)
     repo.reset_translating()
+    quota = PostgresQuotaTracker(pool)
     providers: dict[str, LLMProvider] = {}
+    chain: list[ChainProvider] = []
 
-    def provider_factory(name: str | None) -> LLMProvider:
-        key = name or settings.provider
-        if key not in providers:
-            providers[key] = create_provider(key, settings)
-        return providers[key]
+    def single(name: str) -> LLMProvider:
+        # Một instance (một key) cho mỗi provider, dùng chung giữa các bước của chuỗi.
+        if name not in providers:
+            providers[name] = create_provider(name, settings)
+        return providers[name]
+
+    def get_chain() -> ChainProvider:
+        if not chain:
+            steps = settings.chain_steps()
+            chain.append(ChainProvider(
+                [ChainLink(single(s.provider), s.model) for s in steps], quota
+            ))
+        return chain[0]
+
+    def provider_factory(name: str | None, model: str | None = None) -> LLMProvider:
+        """- provider chỉ định (CLI --provider / NT_PROVIDER) → dùng thẳng, bỏ qua chuỗi.
+        - chỉ có model (--model / NT_MODEL) → provider của bước 1 với model đó.
+        - không chỉ định gì → chuỗi fallback."""
+        name = name or settings.provider
+        if name:
+            return single(name)
+        if model:
+            return single(settings.chain_steps()[0].provider)
+        return get_chain()
 
     return Container(
         settings=settings,
@@ -64,6 +90,8 @@ def build_container(
         ),
         exports=ExportService(repo, {"txt": TxtExporter()}),
         repo=repo,
+        quota=quota,
+        provider_factory=provider_factory,
         pool=pool,
     )
 
