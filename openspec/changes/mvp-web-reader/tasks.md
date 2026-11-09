@@ -2,17 +2,19 @@
 
 ## 1. Quy ước dự án và spike Gemini
 
-- [ ] 1.1 Cập nhật `openspec/config.yaml` theo proposal: bỏ ràng buộc ngang tính năng CLI/API, đặt Gemini là provider mặc định với một request mỗi chương, thêm ràng buộc tuân thủ (API chính thức, không xoay vòng tài khoản, không lách rate limit, không tự động hóa giao diện chat, thư viện riêng tư); kiểm tra bằng `openspec validate mvp-web-reader --strict` vẫn pass
+- [ ] 1.1 Cập nhật `openspec/config.yaml` theo proposal: bỏ ràng buộc ngang tính năng CLI/API, đặt Gemini là provider mặc định với một request mỗi chương, đổi stack từ SQLite sang PostgreSQL (test cần Postgres local), thêm ràng buộc tuân thủ (API chính thức, không xoay vòng tài khoản, không lách rate limit, không tự động hóa giao diện chat, thư viện riêng tư); kiểm tra bằng `openspec validate mvp-web-reader --strict` vẫn pass
 - [ ] 1.2 Sửa `docs/raw/base-idea.md` mục 4.2: thay dòng "Tự dịch chương kế: Không" bằng quy tắc buffer N+1 (tín hiệu đọc, một chương, chỉ dùng quota bước 1); kiểm tra bằng cách đối chiếu với spec `translation-prefetch`
-- [ ] 1.3 Thêm dependency `google-genai`, `argon2-cffi` vào `pyproject.toml`; kiểm tra `uv pip install -e ".[dev]"` thành công
+- [ ] 1.3 Thêm dependency `google-genai`, `argon2-cffi`, `psycopg[binary,pool]` vào `pyproject.toml`; kiểm tra `uv pip install -e ".[dev]"` thành công
 - [ ] 1.4 Spike: script tạm trong scratchpad gọi Gemini bằng key thật, ghi lại (đã ẩn key) mẫu response stream, mẫu lỗi 429 theo phút/ngày (nếu tái hiện được) và danh sách model free tier khả dụng; lưu mẫu lỗi thành fixture `tests/fixtures/gemini_errors/*.json`; kiểm tra fixture tồn tại và chốt giá trị mặc định cho `NT_CHAIN` trong design.md
 
-## 2. Storage: migration và schema mới
+## 2. Storage: PostgreSQL, migration và schema mới
 
-- [ ] 2.1 Viết migration runner dùng `PRAGMA user_version`, thư mục `storage/migrations/`, chuyển schema v0.1 thành `001_initial.sql`, bật WAL + `busy_timeout`; kiểm tra bằng test: DB mới lên đúng version, DB v0.1 có sẵn dữ liệu nâng cấp không mất dữ liệu
-- [ ] 2.2 Viết `002_mvp_web_reader.sql` theo bảng thay đổi trong design D6 (cột mới, bảng suggestions/progress/preferences/provider_usage/sessions, FK cascade); kiểm tra bằng test xóa novel làm mất toàn bộ bản ghi con
-- [ ] 2.3 Cập nhật entity domain (`Chapter` thêm `glossary_version`, `chain_step`, `glossary_outdated`, `possible_omission`, status `edited`; `GlossarySuggestion`, `ReadingProgress`) và `SqliteRepository` tương ứng; kiểm tra bằng pytest các thao tác đọc/ghi mới
-- [ ] 2.4 Thêm khi khởi động: chương `translating` đặt về `pending`; kiểm tra bằng test
+- [ ] 2.1 Chuẩn bị Postgres local: tạo role + database `ai_novel_translator` và `ai_novel_translator_test` trên container `shared-postgres` (chạy SQL qua `docker exec shared-postgres psql`), ghi `NT_DATABASE_URL` và `NT_TEST_DATABASE_URL` vào `.env`; cập nhật `.env.example` (bỏ `NT_DB_PATH`); kiểm tra kết nối được tới cả hai database bằng một lệnh Python ngắn dùng psycopg
+- [ ] 2.2 Thêm cấu hình `NT_DATABASE_URL`, `NT_DB_POOL_MAX` vào `config.py`; tạo pool `psycopg_pool` trong `container.py`, app thoát với lỗi rõ ràng khi không kết nối được; kiểm tra bằng test khởi tạo container với URL sai báo lỗi có tên biến
+- [ ] 2.3 Viết migration runner (bảng `schema_migrations`, `pg_advisory_lock`, mỗi file một transaction) và `storage/migrations/001_initial.sql` theo bảng schema ở design D6 (kiểu Postgres, CHECK status, FK `ON DELETE CASCADE`); kiểm tra bằng test: database trống lên đúng version, chạy lại lần hai không làm gì, file lỗi được rollback sạch
+- [ ] 2.4 Fixture pytest theo D6 (đọc `NT_TEST_DATABASE_URL`, dừng sớm kèm hướng dẫn nếu thiếu hoặc không kết nối được, dựng schema một lần mỗi phiên, `TRUNCATE ... RESTART IDENTITY CASCADE` sau mỗi test); kiểm tra test migration của 2.3 chạy qua fixture này và database test sạch sau mỗi test
+- [ ] 2.5 Cập nhật entity domain (`Chapter` thêm `glossary_version`, `chain_step`, `glossary_outdated`, `possible_omission`, status `edited`; `GlossarySuggestion`, `ReadingProgress`) và viết `storage/postgres_repo.py` thay cho `sqlite_repo.py` (xóa file SQLite), upsert bằng `ON CONFLICT`; chuyển `tests/conftest.py` sang fixture Postgres của 2.4; kiểm tra 8 test hiện có pass trên Postgres, cộng test các thao tác đọc/ghi mới và test xóa novel làm mất toàn bộ bản ghi con
+- [ ] 2.6 Thêm khi khởi động: chương `translating` đặt về `pending`; kiểm tra bằng test
 
 ## 3. Lỗi provider, streaming và Gemini
 
@@ -23,7 +25,7 @@
 
 ## 4. Chuỗi fallback và quota
 
-- [ ] 4.1 Port `QuotaTracker` + adapter SQLite `provider_usage` (đếm lượt thành công, ghi `exhausted_until`, tự hết hiệu lực khi qua thời điểm reset); kiểm tra bằng unit test có điều khiển đồng hồ
+- [ ] 4.1 Port `QuotaTracker` + adapter PostgreSQL `provider_usage` (đếm lượt thành công bằng `UPDATE ... requests = requests + 1`, ghi `exhausted_until`, tự hết hiệu lực khi qua thời điểm reset); kiểm tra bằng unit test có điều khiển đồng hồ và test hai thread cùng tăng đếm không mất lượt
 - [ ] 4.2 Hiện thực `providers/chain.py` với policy FOREGROUND/BACKGROUND theo D2 (bỏ qua bước đã hết quota, chuyển bước khi hết quota ngày, backoff tối đa 3 lần khi rate limit, dừng khi gặp lỗi khác hoặc lỗi giữa stream); kiểm tra bằng test cho mọi scenario trong spec `llm-providers` (Primary exhausted, Non-quota error, Whole chain exhausted, Recovered after wait)
 - [ ] 4.3 Nối `ChainProvider` trong `container.py`, giữ khả năng override provider/model từ CLI; kiểm tra bằng test spec "Model override" và "Select provider per request"
 
@@ -68,14 +70,14 @@
 
 ## 10. Đóng gói và triển khai
 
-- [ ] 10.1 `Dockerfile` multi-stage (Node build `web/` → Python slim, uvicorn `--workers 1`, volume `/data`) và `docker-compose.yml` mẫu; kiểm tra `docker build` thành công và container trả `/health` OK
-- [ ] 10.2 Viết `docs/DEPLOY.md`: biến môi trường, tạo hash mật khẩu, cấu hình reverse proxy cho subdomain (Nginx và Caddy, tắt buffering cho SSE), sao lưu/rollback DB; kiểm tra bằng cách làm theo tài liệu trên máy local với docker compose
+- [ ] 10.1 `Dockerfile` multi-stage (Node build `web/` → Python 3.14 slim, cùng phiên bản với môi trường dev; uvicorn `--workers 1`; không cần volume dữ liệu) và `docker-compose.yml` mẫu nối vào Docker network `external` của `shared-postgres` (tên network và host lấy từ biến); kiểm tra `docker build` thành công và container trả `/health` OK khi chạy cùng `shared-postgres` local
+- [ ] 10.2 Viết `docs/DEPLOY.md`: lệnh SQL tạo role + database, biến môi trường, tạo hash mật khẩu, cách tìm tên network của `shared-postgres`, cấu hình reverse proxy cho subdomain (Nginx và Caddy, tắt buffering cho SSE), sao lưu bằng `pg_dump -Fc` và rollback bằng `pg_restore`; kiểm tra bằng cách làm theo tài liệu trên máy local với docker compose
 - [ ] 10.3 Cập nhật `docs/ARCHITECTURE.md` (sơ đồ có web/SSE/job manager/chain, bảng lớp, backlog mới) và `CLAUDE.md` (lệnh build web, env mới); kiểm tra các lệnh ghi trong tài liệu chạy được
 
 ## 11. Kiểm tra tích hợp
 
 - [ ] 11.1 Chạy `pytest -q` và `ruff check src tests` toàn bộ; kiểm tra pass
-- [ ] 11.2 Kịch bản end-to-end trên container local với provider `echo`: đăng nhập → upload → mở chương 1 (thấy streaming) → đọc 30 giây → chương 2 đã dịch sẵn → đồng ý một tên đề xuất → đổi tên đó → chương bị ảnh hưởng có nhãn → sửa tay một chương → xóa truyện; kiểm tra mọi bước đúng spec
+- [ ] 11.2 Kịch bản end-to-end trên container local (nối `shared-postgres`, database `ai_novel_translator`) với provider `echo`: đăng nhập → upload → mở chương 1 (thấy streaming) → đọc 30 giây → chương 2 đã dịch sẵn → đồng ý một tên đề xuất → đổi tên đó → chương bị ảnh hưởng có nhãn → sửa tay một chương → xóa truyện; kiểm tra mọi bước đúng spec
 - [ ] 11.3 Smoke test với Gemini thật (key cá nhân): dịch 2 chương, xác nhận đếm lượt và nhãn model; kiểm tra màn hình quota hiển thị đúng số lượt
 - [ ] 11.4 `openspec validate mvp-web-reader --strict` pass
 

@@ -6,7 +6,7 @@ Hiện trạng v0.1 (xem `docs/ARCHITECTURE.md`):
 - **Lõi hexagonal:** `domain/` → `pipeline/` → `application/services.py`; adapter nằm ở `providers/`, `storage/sqlite_repo.py`, `ingest/`, `export/`; mọi thứ được nối trong `container.py`.
 - **Provider:** đều đồng bộ, `LLMProvider.complete()` trả về toàn bộ text. Đã có `anthropic`, `openai`, `ollama`, `echo`; chưa có Gemini.
 - **Pipeline:** `ChapterTranslator` gọi riêng một request cho tiêu đề, rồi cắt nội dung thành các đoạn 3.000 ký tự, mỗi đoạn một request.
-- **Storage:** SQLite với ba bảng `novels`, `chapters`, `glossary`. Chưa có cơ chế migration.
+- **Storage:** SQLite với ba bảng `novels`, `chapters`, `glossary`. Chưa có cơ chế migration. Change này thay bằng PostgreSQL 16 có sẵn: container `shared-postgres` dùng chung với các app khác, trên cả máy dev lẫn VPS.
 - **API:** FastAPI đồng bộ, không có auth. Chưa có frontend.
 
 Ràng buộc chính: một user, một container trên VPS, $0 (Gemini free tier). Quota là tài nguyên khan hiếm. Mục tiêu và phạm vi xem `proposal.md`; hành vi xem các spec trong `specs/`.
@@ -46,7 +46,7 @@ Ràng buộc chính: một user, một container trên VPS, $0 (Gemini free tier
 - `ChainProvider` hiện thực `LLMProvider`, bọc danh sách `(provider, model)` và nhận thêm tham số `policy`:
   - `FOREGROUND`: dùng mọi bước của chuỗi.
   - `BACKGROUND`: chỉ dùng bước 1.
-- Domain có thêm port `QuotaTracker`, adapter SQLite đặt ở `storage/`. Nó ghi số lượt dùng mỗi ngày theo từng bước, và `exhausted_until` của bước nào đã hết quota.
+- Domain có thêm port `QuotaTracker`, adapter PostgreSQL đặt ở `storage/`. Nó ghi số lượt dùng mỗi ngày theo từng bước, và `exhausted_until` của bước nào đã hết quota.
 - `ChainProvider` hỏi tracker trước khi gọi, để bỏ qua bước đã hết mà không gửi request.
 
 **Quy tắc chuyển bước:**
@@ -98,26 +98,47 @@ Provider chỉ việc phân loại lỗi thành `RefusalError`, `TruncatedError`
 
 **Phương án bị loại:** WebSocket. Chỉ cần luồng một chiều, SSE đơn giản hơn và tự reconnect.
 
-### D6. Migration SQLite bằng `PRAGMA user_version`
+### D6. PostgreSQL: kết nối, pool, migration
 
-- `storage/migrations/` chứa các file `NNN_*.sql`. Lúc khởi động, chạy tuần tự những file có số lớn hơn `user_version` hiện tại, mỗi file trong một transaction.
-- `001` là schema v0.1, `002` là phần của change này.
-- Bật `journal_mode=WAL` để thread đọc (API) không bị chặn bởi thread ghi (job).
+**Kết nối**
+- Một biến duy nhất `NT_DATABASE_URL` (`postgresql://<role>:<pass>@<host>:5432/ai_novel_translator`).
+- App dùng database và role riêng trong instance dùng chung. Role chỉ có quyền trên database của mình. App **không** tự tạo database hay role; việc đó làm thủ công một lần, theo `docs/DEPLOY.md`.
+- Trong Docker, container app nối vào Docker network sẵn có của `shared-postgres` (khai báo `external` trong compose) và dùng hostname `shared-postgres`. Khi dev chạy ngoài Docker thì dùng `localhost:5432`.
 
-Thay đổi schema trong `002`:
+**Driver và pool**
+- `psycopg` 3 (đồng bộ, bản binary) với `psycopg_pool.ConnectionPool` (min 1, max 5, cấu hình được qua `NT_DB_POOL_MAX`).
+- Pool dùng chung cho các thread API và hai làn job. Mỗi thao tác repository mượn một kết nối, dùng trong một transaction rồi trả lại.
+- Giới hạn pool nhỏ để không chiếm hết `max_connections` của instance dùng chung.
 
-| Bảng | Thay đổi |
+**Migration**
+- `storage/migrations/` chứa các file `NNN_*.sql`; bảng `schema_migrations(version, applied_at)` ghi lại file nào đã chạy.
+- Lúc khởi động, runner lấy `pg_advisory_lock` để không có hai process cùng migrate, rồi chạy tuần tự các file chưa áp dụng. Mỗi file chạy trong một transaction; Postgres hỗ trợ DDL trong transaction nên file lỗi giữa chừng sẽ rollback sạch.
+- Chỉ có một file `001_initial.sql` chứa toàn bộ schema mới. SQLite v0.1 bị bỏ, không chuyển dữ liệu.
+
+**Phương án bị loại**
+- SQLAlchemy + Alembic: kéo theo ORM/Core cho khoảng 8 bảng với truy vấn đơn giản. Repository viết SQL tay đã đủ.
+- `asyncpg`: toàn bộ code đang đồng bộ.
+
+Schema trong `001_initial.sql`:
+
+| Bảng | Cột chính |
 |---|---|
-| `novels` | thêm `glossary_version INT DEFAULT 0`, `last_read_at TEXT` |
-| `chapters` | thêm `glossary_version INT`, `chain_step INT`, `glossary_outdated INT DEFAULT 0`, `possible_omission INT DEFAULT 0`; `status` nhận thêm giá trị `edited` |
-| `glossary_suggestions` (mới) | `novel_id`, `source_term`, `target_term`, `category`, `status` (`pending`/`dismissed`), UNIQUE(`novel_id`, `source_term`) |
-| `reading_progress` (mới) | `novel_id` PK, `chapter_index`, `position REAL` (0–1), `updated_at` |
-| `preferences` (mới) | `key` PK, `value` (JSON): theme, cỡ chữ, giãn dòng, bật/tắt prefetch |
-| `provider_usage` (mới) | `day`, `step`, `requests`, `exhausted_until`; PK(`day`, `step`) |
-| `sessions` (mới) | `token_hash` PK, `created_at`, `last_seen_at` |
+| `novels` | `id BIGSERIAL` PK, `title`, `source_lang`, `target_lang`, `glossary_version INT NOT NULL DEFAULT 0`, `created_at TIMESTAMPTZ`, `last_read_at TIMESTAMPTZ` |
+| `chapters` | `id BIGSERIAL` PK, `novel_id` FK, `idx INT`, `title`, `source_text`, `translated_title`, `translated_text`, `status TEXT` CHECK (`pending`/`translating`/`translated`/`edited`/`failed`), `provider`, `model`, `chain_step INT`, `glossary_version INT`, `glossary_outdated BOOLEAN DEFAULT false`, `possible_omission BOOLEAN DEFAULT false`, `updated_at TIMESTAMPTZ`; UNIQUE(`novel_id`, `idx`) |
+| `glossary` | `id BIGSERIAL` PK, `novel_id` FK, `source_term`, `target_term`, `note`; UNIQUE(`novel_id`, `source_term`) |
+| `glossary_suggestions` | `novel_id` FK, `source_term`, `target_term`, `category`, `status TEXT` CHECK (`pending`/`dismissed`); UNIQUE(`novel_id`, `source_term`) |
+| `reading_progress` | `novel_id` PK/FK, `chapter_index INT`, `position REAL` (0–1), `updated_at TIMESTAMPTZ` |
+| `preferences` | `key TEXT` PK, `value JSONB`: theme, cỡ chữ, giãn dòng, bật/tắt prefetch |
+| `provider_usage` | `day DATE`, `step INT`, `requests INT`, `exhausted_until TIMESTAMPTZ`; PK(`day`, `step`) |
+| `sessions` | `token_hash TEXT` PK, `created_at`, `last_seen_at TIMESTAMPTZ` |
 
 - Mọi bảng con đều có khóa ngoại `ON DELETE CASCADE` về `novels`, để xóa truyện là xóa sạch.
-- **Dữ liệu v0.1:** không có người dùng thật. Migration `002` chỉ thêm cột và bảng, giữ nguyên dữ liệu cũ. Chương cũ có `glossary_version` NULL, được coi là "không rõ phiên bản" và không gắn nhãn.
+- Upsert (glossary, suggestions, usage, preferences) dùng `INSERT ... ON CONFLICT`. Đếm lượt dùng quota bằng `UPDATE ... SET requests = requests + 1` để an toàn khi hai làn job cùng ghi.
+- Tìm chương có raw chứa term (D9) dùng `strpos(source_text, term) > 0`. Với quy mô một user, quét tuần tự là đủ nhanh; chưa cần index full-text.
+
+**Test**
+- Test dùng database riêng `ai_novel_translator_test` trên Postgres local, lấy từ `NT_TEST_DATABASE_URL`. Biến này chưa đặt thì test báo lỗi rõ ràng, không lặng lẽ skip.
+- Mỗi phiên pytest drop và tạo lại schema `public` rồi chạy migration một lần; mỗi test kết thúc bằng `TRUNCATE ... RESTART IDENTITY CASCADE` mọi bảng.
 
 ### D7. Auth: hash mật khẩu trong env, session lưu server-side
 
@@ -148,7 +169,7 @@ Thay đổi schema trong `002`:
 
 ### D9. Lan truyền đổi tên
 
-- `GlossaryService.set_term` phát hiện đây là thao tác đổi bản dịch của một term đã có. Nó tìm các chương có `source_text LIKE '%term%'`.
+- `GlossaryService.set_term` phát hiện đây là thao tác đổi bản dịch của một term đã có. Nó tìm các chương có raw chứa term (`strpos`, xem D6).
 - Với chương `translated`: thay thế bằng regex với ranh giới từ Unicode, tức không có chữ cái hoặc số đứng liền trước/sau, và phân biệt hoa thường. Sau đó đặt `glossary_outdated=1`.
 - Với chương `edited`: chỉ đặt cờ.
 - Toàn bộ chạy trong một transaction, cùng lúc tăng `novels.glossary_version`.
@@ -160,7 +181,7 @@ Thêm các biến:
 - `GEMINI_API_KEY`, `NT_PASSWORD_HASH`, `NT_TRUSTED_PROXY`
 - `NT_CHAPTER_CHAR_LIMIT` (mặc định 20000)
 
-`NT_MAX_SEGMENT_CHARS` được thay bằng `NT_CHAPTER_CHAR_LIMIT`. Riêng `NT_PROVIDER`/`NT_MODEL` vẫn dùng cho CLI override.
+`NT_MAX_SEGMENT_CHARS` được thay bằng `NT_CHAPTER_CHAR_LIMIT`. Cấu hình database xem D6. Riêng `NT_PROVIDER`/`NT_MODEL` vẫn dùng cho CLI override.
 
 ### Các lớp bị thay đổi
 
@@ -170,7 +191,8 @@ Thêm các biến:
 | `pipeline/` | prompt 3 phần, `SectionParser`, `ChapterTranslator` chuyển sang chạy trên sự kiện, kiểm tra độ đầy đủ |
 | `providers/` | `gemini.py`, `chain.py`; provider cũ thêm `stream` và phân loại lỗi |
 | `application/` | `jobs.py`; service cho prefetch, editing, suggestions, rename, progress, preferences; `ExportService` bỏ qua cờ |
-| `storage/` | migration runner, các repository mới, quota tracker |
+| `storage/` | thay `sqlite_repo.py` bằng `postgres_repo.py` (pool psycopg), migration runner, các repository mới, quota tracker |
+| `config.py` | thêm `NT_DATABASE_URL`, `NT_DB_POOL_MAX`; bỏ `NT_DB_PATH` |
 | `interfaces/api` | auth middleware, router tách theo nhóm, SSE, phục vụ SPA |
 | `interfaces/cli` | `hash-password`; `translate` dùng chuỗi |
 | mới: `web/` | SvelteKit SPA |
@@ -186,15 +208,18 @@ Thêm các biến:
 - **[Thay tên nhầm trong tiếng Việt]** (ví dụ "Tô Nhu" nằm trong "Tô Nhuận") → Có kiểm tra ranh giới từ và chỉ chạy trên chương có raw chứa term. Nhãn glossary-outdated luôn được gắn, nên user có đường dịch lại.
 - **[Free tier: Google có thể dùng dữ liệu]** → Đánh đổi đã chấp nhận trong proposal. Ghi chú trong màn hình cài đặt.
 - **[Token stream đến trình duyệt bị proxy buffer]** → Header `X-Accel-Buffering`; ghi chú cấu hình Nginx/Caddy.
-- **[SQLite ghi đồng thời từ hai làn job và API]** → WAL + `busy_timeout`. Một user nên không có tranh chấp đáng kể.
+- **[Instance Postgres dùng chung hết kết nối hoặc bị app khác làm chậm]** → Pool tối đa 5 kết nối; dùng role và database riêng nên app không đụng dữ liệu app khác. Postgres không kết nối được lúc khởi động thì app thoát với lỗi rõ ràng.
+- **[Test phụ thuộc Postgres local đang chạy]** → Đã chấp nhận. Thiếu `NT_TEST_DATABASE_URL` hoặc không kết nối được thì pytest dừng sớm với thông báo hướng dẫn, thay vì hàng loạt test lỗi khó hiểu. Database test tách riêng nên không bao giờ xóa nhầm dữ liệu thật.
+- **[Đổi tên container hoặc network của `shared-postgres` trên VPS]** → Tên network và host là cấu hình trong compose và `NT_DATABASE_URL`, không hard-code trong code.
 
 ## Migration Plan
 
-1. Sao lưu `data/novels.db` (nếu có).
-2. Build image mới; khi khởi động, migration runner tự áp dụng `001` (nếu DB mới) và `002`.
-3. Cấu hình env: `GEMINI_API_KEY`, `NT_PASSWORD_HASH`, `NT_CHAIN`, `NT_TRUSTED_PROXY`.
+1. Tạo role và database `ai_novel_translator` trên `shared-postgres` (lệnh SQL ghi trong `docs/DEPLOY.md`). Dữ liệu SQLite v0.1 không được chuyển.
+2. Cấu hình env: `NT_DATABASE_URL`, `GEMINI_API_KEY`, `NT_PASSWORD_HASH`, `NT_CHAIN`, `NT_TRUSTED_PROXY`.
+3. Khởi động container app trong network của `shared-postgres`; migration runner tự áp dụng `001`.
 4. Thêm khối subdomain vào reverse proxy, tắt buffering cho `/api/chapters/*/stream`.
-5. **Rollback:** chạy lại image cũ với bản sao lưu DB. Migration chỉ thêm cột và bảng, nhưng image cũ không tự hạ `user_version`, nên rollback phải dùng bản sao lưu.
+5. **Sao lưu:** `pg_dump -Fc ai_novel_translator` chạy định kỳ, chỉ database của app.
+6. **Rollback:** dừng container mới, `pg_restore` bản sao lưu vào database của app, chạy lại image cũ.
 
 ## Open Questions
 
