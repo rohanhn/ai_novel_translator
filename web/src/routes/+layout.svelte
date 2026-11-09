@@ -26,9 +26,12 @@
 		return href === '/' ? path === '/' || path.startsWith('/novels') : path.startsWith(href);
 	}
 
-	onMount(() => {
-		applyPrefs(prefs.value);
-		if (!isLogin) loadPrefs().catch(() => {});
+	onMount(() => applyPrefs(prefs.value));
+
+	// Tải tùy chọn từ server khi vào app, kể cả ngay sau khi đăng nhập ở trình duyệt mới
+	// (trang đăng nhập chưa có session nên bỏ qua).
+	$effect(() => {
+		if (!isLogin && !prefs.loaded) loadPrefs().catch(() => {});
 	});
 </script>
 

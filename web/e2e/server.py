@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -78,6 +79,11 @@ def seed(c, tmp: Path) -> None:
         c.repo.update_chapter(ch)
     c.reader.save_progress(b, 1, 0.5)
     c.reader.save_progress(a, 4, 0.62)  # đọc gần nhất
+    # Bảng lượt dùng ở trang cài đặt: bước 1 dùng 12 lượt, bước 2 hết lượt. Không đánh dấu bước 1
+    # hết lượt vì sẽ tạm dừng prefetch mà các test đọc cần.
+    for _ in range(12):
+        c.quota.record_success(1)
+    c.quota.mark_exhausted(2, datetime.now(timezone.utc) + timedelta(hours=5))
 
 
 def main() -> None:
