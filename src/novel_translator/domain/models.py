@@ -77,6 +77,16 @@ class GlossarySuggestion:
     created_at: datetime = field(default_factory=_now)
 
 
+@dataclass(frozen=True)
+class NovelSummary:
+    """Một dòng trong thư viện."""
+
+    novel: Novel
+    chapter_count: int
+    translated_count: int  # translated + edited
+    last_read_chapter: int | None = None
+
+
 @dataclass
 class ReadingProgress:
     novel_id: int

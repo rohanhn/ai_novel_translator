@@ -9,11 +9,14 @@ from functools import lru_cache
 
 from psycopg_pool import ConnectionPool
 
+from .application.jobs import TranslationJobManager
+from .application.prefetch import PrefetchService
 from .application.services import (
     EditingService,
     ExportService,
     GlossaryService,
     LibraryService,
+    ReaderService,
     TranslationService,
 )
 from .config import Settings
@@ -36,12 +39,16 @@ class Container:
     translation: TranslationService
     exports: ExportService
     editing: EditingService
+    reader: ReaderService
+    jobs: TranslationJobManager
+    prefetch: PrefetchService
     repo: PostgresRepository
     quota: PostgresQuotaTracker
     provider_factory: Callable[[str | None, str | None], LLMProvider]
     pool: ConnectionPool
 
     def close(self) -> None:
+        self.jobs.shutdown()
         self.pool.close()
 
 
@@ -88,15 +95,22 @@ def build_container(
             return single(settings.chain_steps()[0].provider)
         return get_chain()
 
+    translation = TranslationService(
+        repo, provider_factory, settings.chapter_char_limit, default_model=settings.model
+    )
+    # Thread của job manager chỉ khởi động ở lần submit đầu tiên.
+    jobs = TranslationJobManager(translation, autostart=False)
+    prefetch = PrefetchService(repo, jobs, quota)
     return Container(
         settings=settings,
-        library=LibraryService(repo, TxtLoader()),
+        library=LibraryService(repo, TxtLoader(), on_delete=jobs.cancel_queued_for_novel),
         glossary=GlossaryService(repo),
-        translation=TranslationService(
-            repo, provider_factory, settings.chapter_char_limit, default_model=settings.model
-        ),
+        translation=translation,
         exports=ExportService(repo, {"txt": TxtExporter()}),
         editing=EditingService(repo),
+        reader=ReaderService(repo),
+        jobs=jobs,
+        prefetch=prefetch,
         repo=repo,
         quota=quota,
         provider_factory=provider_factory,

@@ -12,6 +12,8 @@ from ..domain.models import (
     GlossaryEntry,
     GlossarySuggestion,
     Novel,
+    NovelSummary,
+    ReadingProgress,
     SuggestionStatus,
 )
 from ..domain.ports import (
@@ -41,9 +43,25 @@ class ConfirmationRequiredError(InvalidOperationError):
 
 
 class LibraryService:
-    def __init__(self, repo: NovelRepository, loader: SourceLoader):
+    def __init__(self, repo: NovelRepository, loader: SourceLoader,
+                 on_delete: Callable[[int], object] | None = None):
         self.repo = repo
         self.loader = loader
+        self.on_delete = on_delete  # vd. hủy prefetch đang chờ của truyện
+
+    def overview(self) -> list[NovelSummary]:
+        return self.repo.library_overview()
+
+    def delete_novel(self, novel_id: int, confirm: bool = False) -> None:
+        """Xóa vĩnh viễn truyện + raw, bản dịch, bộ tên, đề xuất, tiến độ. Cần xác nhận."""
+        self.get_novel(novel_id)
+        if not confirm:
+            raise ConfirmationRequiredError(
+                "Xóa truyện sẽ xóa vĩnh viễn mọi dữ liệu liên quan. Cần xác nhận để tiếp tục."
+            )
+        if self.on_delete is not None:
+            self.on_delete(novel_id)
+        self.repo.delete_novel(novel_id)
 
     def import_novel(self, path: Path, title: str | None = None) -> tuple[Novel, int]:
         raw = self.loader.load(path)
@@ -257,6 +275,68 @@ class TranslationService:
         self, novel_id: int, start: int, end: int, **kwargs
     ) -> list[Chapter]:
         return [self.translate_chapter(novel_id, i, **kwargs) for i in range(start, end + 1)]
+
+
+THEMES = ("light", "sepia", "dark", "bamboo")  # Tuyên chỉ, Hoàng quyển, Dạ nguyệt, Trúc lâm
+DEFAULT_PREFERENCES: dict[str, object] = {
+    "theme": "light", "font_size": 18, "line_height": 1.8, "prefetch": True,
+}
+
+
+class ReaderService:
+    """Tiến độ đọc theo truyện + tùy chọn đọc (lưu server-side, dùng chung mọi thiết bị)."""
+
+    def __init__(self, repo: NovelRepository):
+        self.repo = repo
+
+    def save_progress(self, novel_id: int, chapter_index: int, position: float
+                      ) -> ReadingProgress:
+        if not self.repo.get_chapter(novel_id, chapter_index):
+            raise NotFoundError(f"Không có chương {chapter_index} của truyện {novel_id}")
+        if not 0.0 <= position <= 1.0:
+            raise ValueError("position phải nằm trong khoảng 0–1.")
+        progress = ReadingProgress(novel_id, chapter_index, position)
+        with self.repo.unit_of_work():
+            self.repo.save_progress(progress)
+            self.repo.touch_novel_read(novel_id)
+        return progress
+
+    def get_progress(self, novel_id: int) -> ReadingProgress | None:
+        if not self.repo.get_novel(novel_id):
+            raise NotFoundError(f"Không có truyện id={novel_id}")
+        return self.repo.get_progress(novel_id)
+
+    def get_preferences(self) -> dict[str, object]:
+        stored = self.repo.get_preferences()
+        return {k: stored.get(k, v) for k, v in DEFAULT_PREFERENCES.items()}
+
+    def set_preferences(self, changes: dict[str, object]) -> dict[str, object]:
+        clean = {k: _validate_pref(k, v) for k, v in changes.items()}
+        with self.repo.unit_of_work():
+            for k, v in clean.items():
+                self.repo.set_preference(k, v)
+        return self.get_preferences()
+
+
+def _validate_pref(key: str, value: object) -> object:
+    if key == "theme":
+        if value not in THEMES:
+            raise ValueError(f"theme phải là một trong: {', '.join(THEMES)}")
+        return value
+    if key == "font_size":
+        if isinstance(value, bool) or not isinstance(value, int) or not 12 <= value <= 32:
+            raise ValueError("font_size phải là số nguyên 12–32.")
+        return value
+    if key == "line_height":
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not (
+                1.2 <= value <= 2.4):
+            raise ValueError("line_height phải trong khoảng 1.2–2.4.")
+        return float(value)
+    if key == "prefetch":
+        if not isinstance(value, bool):
+            raise ValueError("prefetch phải là true/false.")
+        return value
+    raise ValueError(f"Tùy chọn không hỗ trợ: {key}")
 
 
 class EditingService:

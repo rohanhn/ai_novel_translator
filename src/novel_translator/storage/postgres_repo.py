@@ -17,6 +17,7 @@ from ..domain.models import (
     GlossaryEntry,
     GlossarySuggestion,
     Novel,
+    NovelSummary,
     ReadingProgress,
     SuggestionStatus,
 )
@@ -77,6 +78,20 @@ class PostgresRepository:
 
     def list_novels(self) -> list[Novel]:
         return [_novel(r) for r in self._all("SELECT * FROM novels ORDER BY id")]
+
+    def library_overview(self) -> list[NovelSummary]:
+        """Thư viện: đọc gần nhất lên đầu; truyện chưa đọc xếp sau, mới thêm trước."""
+        rows = self._all(
+            "SELECT n.*,"
+            " (SELECT count(*) FROM chapters c WHERE c.novel_id = n.id) AS chapter_count,"
+            " (SELECT count(*) FROM chapters c WHERE c.novel_id = n.id"
+            "   AND c.status IN ('translated', 'edited')) AS translated_count,"
+            " p.chapter_index AS last_read_chapter"
+            " FROM novels n LEFT JOIN reading_progress p ON p.novel_id = n.id"
+            " ORDER BY n.last_read_at DESC NULLS LAST, n.created_at DESC, n.id DESC"
+        )
+        return [NovelSummary(_novel(r), r["chapter_count"], r["translated_count"],
+                             r["last_read_chapter"]) for r in rows]
 
     def delete_novel(self, novel_id: int) -> bool:
         """Xóa truyện; FK ON DELETE CASCADE xóa sạch chương, bộ tên, đề xuất, tiến độ."""

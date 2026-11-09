@@ -172,14 +172,18 @@ class TranslationJobManager:
         self._jobs: dict[tuple[int, int], Job] = {}
         self._cond = threading.Condition()
         self._stopping = False
+        self._started = False
         self._lanes = {lane: _LaneWorker(self, lane) for lane in Lane}
         if autostart:
             self.start()
 
     def start(self) -> None:
+        with self._cond:
+            if self._started:
+                return
+            self._started = True
         for w in self._lanes.values():
-            if not w.thread.is_alive():
-                w.thread.start()
+            w.thread.start()
 
     def shutdown(self) -> None:
         with self._cond:
@@ -194,6 +198,7 @@ class TranslationJobManager:
         Kiểm tra trước (chương tồn tại, xác nhận khi dịch lại chương đã biên tập) để lỗi
         được báo ngay cho người gọi thay vì thành sự kiện `failed`."""
         self.translation.check_translatable(novel_id, index, force, confirm_discard_edits)
+        self.start()
         with self._cond:
             job = self._jobs.get((novel_id, index))
             if job is not None:
