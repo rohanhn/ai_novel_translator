@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import queue
 import threading
+import time
 from collections import deque
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -26,6 +27,9 @@ from ..pipeline.sections import Paragraph, Title
 from .services import NotFoundError, TranslationService
 
 TERMINAL = frozenset({"completed", "failed", "quota_exhausted", "cancelled"})
+# Job đã kết thúc được giữ lại một lúc để client mở stream sau khi job xong (vd. lỗi ngay sau
+# khi trả 202) vẫn nhận được sự kiện kết thúc kèm loại lỗi.
+RECENT_TTL_S = 120.0
 
 
 class Lane(str, Enum):
@@ -94,23 +98,35 @@ class Job:
         for q in subscribers:
             q.put(event)
 
-    def subscribe(self) -> Iterator[JobEvent]:
-        """Phát lại mọi sự kiện đã có rồi các sự kiện mới, dừng sau sự kiện kết thúc."""
+    def subscribe(self, heartbeat: float | None = None) -> Iterator[JobEvent | None]:
+        """Phát lại mọi sự kiện đã có rồi các sự kiện mới, dừng sau sự kiện kết thúc.
+        Có `heartbeat` (giây): sau mỗi khoảng chờ không có sự kiện thì yield None (để gửi
+        keep-alive); không có thì chỉ yield JobEvent."""
         q: queue.Queue[JobEvent] = queue.Queue()
         with self._lock:
             backlog = list(self._events)
             if not self._done.is_set():
                 self._subscribers.append(q)
-        return self._iterate(backlog, q)
+        return self._iterate(backlog, q, heartbeat)
 
-    def _iterate(self, backlog: list[JobEvent], q: queue.Queue[JobEvent]) -> Iterator[JobEvent]:
+    @property
+    def subscriber_count(self) -> int:
+        with self._lock:
+            return len(self._subscribers)
+
+    def _iterate(self, backlog: list[JobEvent], q: queue.Queue[JobEvent],
+                 heartbeat: float | None) -> Iterator[JobEvent | None]:
         try:
             for ev in backlog:
                 yield ev
                 if ev.terminal:
                     return
             while True:
-                ev = q.get()
+                try:
+                    ev = q.get(timeout=heartbeat)
+                except queue.Empty:
+                    yield None
+                    continue
                 yield ev
                 if ev.terminal:
                     return
@@ -166,6 +182,7 @@ class _LaneWorker:
                     job.state = JobState.DONE
                     if m._jobs.get(job.key) is job:
                         del m._jobs[job.key]
+                        m._remember(job)
                     m._cond.notify_all()
 
 
@@ -173,6 +190,7 @@ class TranslationJobManager:
     def __init__(self, translation: TranslationService, autostart: bool = True):
         self.translation = translation
         self._jobs: dict[tuple[int, int], Job] = {}
+        self._recent: dict[tuple[int, int], tuple[Job, float]] = {}
         self._cond = threading.Condition()
         self._stopping = False
         self._started = False
@@ -220,8 +238,28 @@ class TranslationJobManager:
             return job
 
     def get(self, novel_id: int, index: int) -> Job | None:
+        """Job đang chờ/chạy của chương (không tính job đã kết thúc)."""
         with self._cond:
             return self._jobs.get((novel_id, index))
+
+    def latest(self, novel_id: int, index: int) -> Job | None:
+        """Job đang chờ/chạy, hoặc job vừa kết thúc trong RECENT_TTL_S giây."""
+        with self._cond:
+            job = self._jobs.get((novel_id, index))
+            if job is not None:
+                return job
+            self._prune_recent()
+            recent = self._recent.get((novel_id, index))
+            return recent[0] if recent else None
+
+    def _remember(self, job: Job) -> None:  # gọi khi đang giữ self._cond
+        self._prune_recent()
+        self._recent[job.key] = (job, time.monotonic())
+
+    def _prune_recent(self) -> None:
+        cutoff = time.monotonic() - RECENT_TTL_S
+        for k in [k for k, (_, t) in self._recent.items() if t < cutoff]:
+            del self._recent[k]
 
     def cancel(self, novel_id: int, index: int) -> bool:
         """Hủy job còn chờ; job đang chạy (đã gửi request) thì không hủy."""
@@ -232,6 +270,7 @@ class TranslationJobManager:
             self._lanes[job.lane].pending.remove(job)
             del self._jobs[job.key]
             job.state = JobState.DONE
+            self._remember(job)
         job.publish(JobEvent("cancelled"))
         return True
 

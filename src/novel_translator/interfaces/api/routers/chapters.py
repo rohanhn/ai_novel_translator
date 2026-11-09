@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
+import json
+from collections.abc import Iterator
 
-from ....application.jobs import Lane
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse, StreamingResponse
+
+from ....application.jobs import JobEvent, Lane
+from ....application.services import NotFoundError
 from ....container import Container, get_container
 from ....domain.models import ChapterStatus
 from ..schemas import ChapterEditIn, ChapterOut, ChapterSummary, TranslateAccepted, TranslateIn
@@ -54,3 +58,46 @@ def translate(novel_id: int, index: int, body: TranslateIn,
                         provider=body.provider, model=body.model)
     return TranslateAccepted(state=job.state.value, lane=job.lane.value,
                              stream_url=stream_url(novel_id, index))
+
+
+KEEPALIVE_S = 15.0
+SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+
+def _sse(seq: int, ev: JobEvent) -> str:
+    data = json.dumps(ev.data, ensure_ascii=False)
+    return f"id: {seq}\nevent: {ev.type}\ndata: {data}\n\n"
+
+
+def _event_stream(events: Iterator[JobEvent | None]) -> Iterator[str]:
+    seq = 0
+    for ev in events:
+        if ev is None:
+            yield ": keep-alive\n\n"
+            continue
+        seq += 1
+        yield _sse(seq, ev)
+
+
+@router.get("/{index}/stream", response_class=StreamingResponse,
+            responses={200: {"content": {"text/event-stream": {}}}})
+def stream(novel_id: int, index: int, c: Container = Depends(get_container)):
+    """SSE của job dịch chương (design D5): phát lại sự kiện đã có (subscriber vào muộn), rồi
+    `title`/`paragraph`/`waiting_for_quota`/`fallback_step`, kết thúc bằng đúng một sự kiện
+    `completed`/`failed`/`quota_exhausted`/`cancelled`. Keep-alive mỗi 15 giây.
+
+    Không có job (kể cả job vừa kết thúc): chương đã dịch → chỉ một sự kiện `completed`;
+    còn lại → 404."""
+    job = c.jobs.latest(novel_id, index)
+    if job is not None:
+        events: Iterator[JobEvent | None] = job.subscribe(heartbeat=KEEPALIVE_S)
+    else:
+        ch = c.library.get_chapter(novel_id, index)
+        if ch.status not in (ChapterStatus.TRANSLATED, ChapterStatus.EDITED):
+            raise NotFoundError(f"Chương {index} không có bản dịch nào đang chạy")
+        events = iter([JobEvent("completed", {
+            "status": ch.status.value, "title": ch.translated_title, "provider": ch.provider,
+            "model": ch.model, "chain_step": ch.chain_step,
+            "possible_omission": ch.possible_omission})])
+    return StreamingResponse(_event_stream(events), media_type="text/event-stream",
+                             headers=SSE_HEADERS)
