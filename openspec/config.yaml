@@ -1,0 +1,33 @@
+schema: spec-driven
+
+context: |
+  Sản phẩm: công cụ dịch truyện mạng Trung → Việt bằng LLM, dùng cá nhân/nhóm nhỏ.
+  Ngôn ngữ artifact: viết proposal/design/tasks bằng tiếng Việt; tên requirement, từ khóa
+  SHALL/MUST, WHEN/THEN giữ tiếng Anh để openspec validate hoạt động.
+  Kiến trúc hexagonal (xem docs/ARCHITECTURE.md), bắt buộc tuân thủ:
+    - domain/ không import framework, DB, hay SDK LLM.
+    - CLI (Typer) và HTTP API (FastAPI) là interface mỏng, chỉ gọi application/services.py.
+      Mọi tính năng người dùng thấy được phải có ở CẢ CLI và API trừ khi proposal nói rõ.
+    - Provider LLM mới = 1 class hiện thực LLMProvider + register_provider(); không rẽ nhánh
+      theo tên provider trong pipeline/application.
+    - Adapter cụ thể chỉ được nối trong container.py.
+  Chất lượng dịch là ưu tiên số 1: glossary phải được tôn trọng, không bỏ sót đoạn,
+  giữ thứ tự đoạn. Chi phí LLM là ưu tiên số 2 (tận dụng prompt caching, tránh dịch lại).
+  Test không được gọi LLM thật: dùng provider "echo" hoặc fake.
+  Stack: Python 3.10+, SQLite, pytest, ruff.
+
+rules:
+  proposal:
+    - Nêu rõ phạm vi ngoài lề (out of scope)
+    - Nêu ảnh hưởng tới CLI, API, schema DB, và chi phí LLM (nếu có)
+  design:
+    - Chỉ ra lớp nào (domain/application/pipeline/providers/storage/interfaces) bị thay đổi
+    - Nếu đổi schema DB, mô tả cách migrate dữ liệu cũ
+  tasks:
+    - Mỗi task tối đa ~2 giờ
+    - Luôn có task viết test và task cập nhật docs/ARCHITECTURE.md nếu đổi kiến trúc
+
+operations:
+  apply:
+    guidance:
+      - Chạy `.venv/bin/pytest -q` và `.venv/bin/ruff check src tests` trước khi đánh dấu xong
