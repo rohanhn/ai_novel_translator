@@ -9,7 +9,13 @@ from functools import lru_cache
 
 from psycopg_pool import ConnectionPool
 
-from .application.services import ExportService, GlossaryService, LibraryService, TranslationService
+from .application.services import (
+    EditingService,
+    ExportService,
+    GlossaryService,
+    LibraryService,
+    TranslationService,
+)
 from .config import Settings
 from .domain.ports import LLMProvider
 from .export.txt_exporter import TxtExporter
@@ -29,6 +35,7 @@ class Container:
     glossary: GlossaryService
     translation: TranslationService
     exports: ExportService
+    editing: EditingService
     repo: PostgresRepository
     quota: PostgresQuotaTracker
     provider_factory: Callable[[str | None, str | None], LLMProvider]
@@ -89,6 +96,7 @@ def build_container(
             repo, provider_factory, settings.chapter_char_limit, default_model=settings.model
         ),
         exports=ExportService(repo, {"txt": TxtExporter()}),
+        editing=EditingService(repo),
         repo=repo,
         quota=quota,
         provider_factory=provider_factory,

@@ -62,13 +62,16 @@ def translate(
     provider: str | None = typer.Option(None, "--provider", "-p"),
     model: str | None = typer.Option(None, "--model", "-m"),
     force: bool = typer.Option(False, help="Dịch lại cả chương đã dịch"),
+    discard_edits: bool = typer.Option(
+        False, "--discard-edits", help="Xác nhận dịch lại chương đã biên tập (mất bản sửa tay)"),
 ):
     """Dịch một hoặc nhiều chương qua chuỗi provider (hoặc --provider/--model để override)."""
     svc = _c().translation
     for i in range(start, (end or start) + 1):
         try:
             ch = svc.translate_chapter(novel_id, i, provider=provider, model=model, force=force,
-                                       on_event=_print_chain_event)
+                                       on_event=_print_chain_event,
+                                       confirm_discard_edits=discard_edits)
         except DailyQuotaError as e:
             when = f" Reset lúc {_local(e.reset_at)}." if e.reset_at else ""
             _fail(f"✗ Chương {i}: hết lượt hôm nay ở mọi bước của chuỗi.{when}")

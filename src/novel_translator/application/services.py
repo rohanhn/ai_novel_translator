@@ -32,6 +32,14 @@ class NotFoundError(LookupError):
     pass
 
 
+class InvalidOperationError(ValueError):
+    """Thao tác không hợp lệ với trạng thái hiện tại (vd. sửa chương chưa dịch)."""
+
+
+class ConfirmationRequiredError(InvalidOperationError):
+    """Thao tác làm mất dữ liệu (dịch lại chương đã biên tập) cần chủ sở hữu xác nhận."""
+
+
 class LibraryService:
     def __init__(self, repo: NovelRepository, loader: SourceLoader):
         self.repo = repo
@@ -176,11 +184,10 @@ class TranslationService:
         force: bool = False,
         policy: ChainPolicy = ChainPolicy.FOREGROUND,
         on_event: Callable[[TranslatorEvent], None] | None = None,
+        confirm_discard_edits: bool = False,
     ) -> Chapter:
         novel = self.repo.get_novel(novel_id)
-        chapter = self.repo.get_chapter(novel_id, index)
-        if not novel or not chapter:
-            raise NotFoundError(f"Không có chương {index} của truyện {novel_id}")
+        chapter = self.check_translatable(novel_id, index, force, confirm_discard_edits)
         if chapter.status in (ChapterStatus.TRANSLATED, ChapterStatus.EDITED) and not force:
             return chapter  # đã có bản dịch: không gọi LLM
 
@@ -220,6 +227,20 @@ class TranslationService:
         self._queue_suggestions(novel_id, glossary, out.names)
         return chapter
 
+    def check_translatable(self, novel_id: int, index: int, force: bool = False,
+                           confirm_discard_edits: bool = False) -> Chapter:
+        """Kiểm tra trước khi tạo job: chương tồn tại; dịch lại chương đã biên tập phải có
+        xác nhận (bản sửa tay sẽ mất)."""
+        chapter = self.repo.get_chapter(novel_id, index)
+        if not self.repo.get_novel(novel_id) or not chapter:
+            raise NotFoundError(f"Không có chương {index} của truyện {novel_id}")
+        if chapter.status == ChapterStatus.EDITED and force and not confirm_discard_edits:
+            raise ConfirmationRequiredError(
+                f"Chương {index} đã được biên tập tay; dịch lại sẽ mất bản sửa. "
+                "Cần xác nhận để tiếp tục."
+            )
+        return chapter
+
     def _queue_suggestions(self, novel_id: int, glossary: list[GlossaryEntry],
                            names: list[NameItem]) -> None:
         """Đưa tên mới vào hàng chờ duyệt; bỏ qua term đã có trong bộ tên. Term đã có trong
@@ -236,6 +257,31 @@ class TranslationService:
         self, novel_id: int, start: int, end: int, **kwargs
     ) -> list[Chapter]:
         return [self.translate_chapter(novel_id, i, **kwargs) for i in range(start, end + 1)]
+
+
+class EditingService:
+    """Sửa tay bản dịch. Chương đã sửa có trạng thái `edited` và không bị thay đổi tự động."""
+
+    def __init__(self, repo: NovelRepository):
+        self.repo = repo
+
+    def edit_chapter(self, novel_id: int, index: int, translated_title: str | None,
+                     translated_text: str) -> Chapter:
+        chapter = self.repo.get_chapter(novel_id, index)
+        if not chapter:
+            raise NotFoundError(f"Không có chương {index} của truyện {novel_id}")
+        if (chapter.status not in (ChapterStatus.TRANSLATED, ChapterStatus.EDITED)
+                or chapter.translated_text is None):
+            raise InvalidOperationError(f"Chương {index} chưa có bản dịch để biên tập.")
+        text = "\n".join(line.rstrip() for line in translated_text.strip().splitlines())
+        if not text:
+            raise InvalidOperationError("Nội dung bản dịch không được để trống.")
+        title = translated_title.strip() if translated_title else None
+        chapter.translated_title = title or chapter.translated_title
+        chapter.translated_text = text
+        chapter.status = ChapterStatus.EDITED
+        self.repo.update_chapter(chapter)
+        return chapter
 
 
 class ExportService:

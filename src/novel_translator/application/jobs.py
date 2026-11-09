@@ -53,11 +53,13 @@ class JobEvent:
 
 
 class Job:
-    def __init__(self, novel_id: int, index: int, lane: Lane, force: bool = False):
+    def __init__(self, novel_id: int, index: int, lane: Lane, force: bool = False,
+                 confirm_discard_edits: bool = False):
         self.novel_id = novel_id
         self.index = index
         self.lane = lane
         self.force = force
+        self.confirm_discard_edits = confirm_discard_edits
         self.state = JobState.QUEUED
         self._events: list[JobEvent] = []
         self._subscribers: list[queue.Queue[JobEvent]] = []
@@ -186,8 +188,12 @@ class TranslationJobManager:
 
     # --- API ---
     def submit(self, novel_id: int, index: int, lane: Lane = Lane.FOREGROUND,
-               force: bool = False) -> Job:
-        """Tạo job hoặc trả về job đang có của chương (nâng làn nếu cần)."""
+               force: bool = False, confirm_discard_edits: bool = False) -> Job:
+        """Tạo job hoặc trả về job đang có của chương (nâng làn nếu cần).
+
+        Kiểm tra trước (chương tồn tại, xác nhận khi dịch lại chương đã biên tập) để lỗi
+        được báo ngay cho người gọi thay vì thành sự kiện `failed`."""
+        self.translation.check_translatable(novel_id, index, force, confirm_discard_edits)
         with self._cond:
             job = self._jobs.get((novel_id, index))
             if job is not None:
@@ -198,7 +204,7 @@ class TranslationJobManager:
                     self._lanes[Lane.FOREGROUND].pending.append(job)
                     self._cond.notify_all()
                 return job
-            job = Job(novel_id, index, lane, force)
+            job = Job(novel_id, index, lane, force, confirm_discard_edits)
             self._jobs[job.key] = job
             self._lanes[lane].pending.append(job)
             self._cond.notify_all()
@@ -238,6 +244,7 @@ class TranslationJobManager:
             ch = self.translation.translate_chapter(
                 job.novel_id, job.index, force=job.force, policy=job.policy,
                 on_event=job.on_pipeline_event,
+                confirm_discard_edits=job.confirm_discard_edits,
             )
         except DailyQuotaError as e:
             job.publish(JobEvent("quota_exhausted", {
