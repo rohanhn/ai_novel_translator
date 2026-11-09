@@ -12,6 +12,7 @@ from ..domain.models import (
     GlossaryEntry,
     GlossarySuggestion,
     Novel,
+    SuggestionStatus,
 )
 from ..domain.ports import (
     DailyQuotaError,
@@ -68,17 +69,62 @@ class LibraryService:
 
 
 class GlossaryService:
+    """Bộ tên của truyện. Mọi thay đổi (thêm/sửa/xóa) đều tăng `glossary_version`."""
+
     def __init__(self, repo: NovelRepository):
         self.repo = repo
 
-    def set_term(self, novel_id: int, source: str, target: str, note: str | None = None):
-        return self.repo.upsert_glossary(GlossaryEntry(novel_id, source, target, note))
+    def _require_novel(self, novel_id: int) -> Novel:
+        novel = self.repo.get_novel(novel_id)
+        if not novel:
+            raise NotFoundError(f"Không có truyện id={novel_id}")
+        return novel
+
+    def set_term(self, novel_id: int, source: str, target: str, note: str | None = None
+                 ) -> GlossaryEntry:
+        source, target = source.strip(), target.strip()
+        if not source or not target:
+            raise ValueError("Thuật ngữ nguồn và bản dịch không được để trống.")
+        self._require_novel(novel_id)
+        current = {g.source_term: g for g in self.repo.list_glossary(novel_id)}.get(source)
+        entry = self.repo.upsert_glossary(GlossaryEntry(novel_id, source, target, note))
+        if current is None or (current.target_term, current.note) != (target, note):
+            self.repo.bump_glossary_version(novel_id)
+        return entry
 
     def list_terms(self, novel_id: int) -> list[GlossaryEntry]:
         return self.repo.list_glossary(novel_id)
 
     def remove_term(self, novel_id: int, source: str) -> bool:
-        return self.repo.delete_glossary(novel_id, source)
+        removed = self.repo.delete_glossary(novel_id, source)
+        if removed:
+            self.repo.bump_glossary_version(novel_id)
+        return removed
+
+    # --- hàng chờ tên do LLM đề xuất ---
+    def list_suggestions(self, novel_id: int) -> list[GlossarySuggestion]:
+        self._require_novel(novel_id)
+        return self.repo.list_suggestions(novel_id, SuggestionStatus.PENDING)
+
+    def _pending(self, novel_id: int, source: str) -> GlossarySuggestion:
+        s = self.repo.get_suggestion(novel_id, source)
+        if not s or s.status != SuggestionStatus.PENDING:
+            raise NotFoundError(f"Không có đề xuất '{source}' đang chờ duyệt")
+        return s
+
+    def accept_suggestion(self, novel_id: int, source: str, target: str | None = None
+                          ) -> GlossaryEntry:
+        """Đồng ý (có thể kèm sửa bản dịch): thêm vào bộ tên và bỏ khỏi hàng chờ."""
+        s = self._pending(novel_id, source)
+        entry = self.set_term(novel_id, s.source_term, (target or s.target_term),
+                              note=s.category)
+        self.repo.delete_suggestion(novel_id, s.source_term)
+        return entry
+
+    def dismiss_suggestion(self, novel_id: int, source: str) -> None:
+        """Bỏ qua: giữ bản ghi `dismissed` để lần dịch sau không đề xuất lại."""
+        self._pending(novel_id, source)
+        self.repo.set_suggestion_status(novel_id, source, SuggestionStatus.DISMISSED)
 
 
 class TranslationService:

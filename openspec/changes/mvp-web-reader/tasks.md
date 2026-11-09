@@ -43,7 +43,7 @@
 
 ## 7. Bộ tên, biên tập, tiến độ, tùy chọn
 
-- [ ] 7.1 Service hàng chờ đề xuất tên (đồng ý / đồng ý kèm sửa / bỏ qua) và tăng `glossary_version` mỗi khi bộ tên thay đổi; kiểm tra bằng test các scenario "Suggestion review queue" và "Glossary versioning"
+- [x] 7.1 Service hàng chờ đề xuất tên (đồng ý / đồng ý kèm sửa / bỏ qua) và tăng `glossary_version` mỗi khi bộ tên thay đổi; kiểm tra bằng test các scenario "Suggestion review queue" và "Glossary versioning"
 - [ ] 7.2 Lan truyền đổi tên theo D9 (chỉ chương có raw chứa term, regex ranh giới từ Unicode, chương edited chỉ gắn cờ, một transaction); kiểm tra bằng test "Rename applied", "Unrelated chapter untouched", "Partial word not replaced", "Edited chapter labelled only"
 - [ ] 7.3 Service biên tập: sửa tay → `edited`; từ chối sửa chương chưa dịch; dịch lại chương edited phải có xác nhận; dịch lại thì xóa cờ outdated; kiểm tra bằng test spec `translation-editing`
 - [ ] 7.4 Service tiến độ đọc + tùy chọn đọc (lưu server-side) + `last_read_at` và thứ tự thư viện; xóa truyện cần xác nhận và hủy prefetch đang chờ; kiểm tra bằng test spec `novel-library` và "Reading progress"
