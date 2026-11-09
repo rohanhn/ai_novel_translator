@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = Field(default=None, validation_alias="GEMINI_API_KEY")
     gemini_timeout: float = 120.0
 
+    # Đăng nhập: hash argon2 (tạo bằng `novel hash-password`), không bao giờ là mật khẩu gốc.
+    password_hash: SecretStr | None = None
+    # IP (phân tách bằng dấu phẩy) của reverse proxy được tin để đọc X-Forwarded-For.
+    trusted_proxy: str | None = None
+    # Cookie Secure (bắt buộc với HTTPS); chỉ tắt khi chạy thử qua http://localhost.
+    cookie_secure: bool = True
+
     # PostgreSQL: postgresql://<role>:<pass>@<host>:5432/<db>; pool nhỏ vì instance dùng chung
     database_url: str | None = None
     db_pool_max: int = 5

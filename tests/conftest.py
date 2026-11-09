@@ -84,9 +84,21 @@ def test_db_url(pg_pool) -> str:
     return _TestDbSettings().test_database_url
 
 
+TEST_PASSWORD = "mat-khau-thu-nghiem"
+
+
+@pytest.fixture(scope="session")
+def password_hash() -> str:
+    from novel_translator.security import hash_password
+
+    return hash_password(TEST_PASSWORD)
+
+
 @pytest.fixture
-def container(db):
-    return build_container(Settings(provider="echo"), pool=db)
+def container(db, password_hash):
+    return build_container(
+        Settings(provider="echo", password_hash=password_hash, cookie_secure=False), pool=db
+    )
 
 
 @pytest.fixture
@@ -111,6 +123,21 @@ def api_client(container):
     from novel_translator.interfaces.api.app import app
 
     app.dependency_overrides[get_container] = lambda: container
-    yield TestClient(app)
+    client = TestClient(app, headers={"X-Requested-With": "test"})
+    r = client.post("/api/auth/login", json={"password": TEST_PASSWORD})
+    assert r.status_code == 204, r.text
+    yield client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def anon_client(container):
+    """Client chưa đăng nhập (vẫn gửi header chống CSRF)."""
+    from fastapi.testclient import TestClient
+
+    from novel_translator.interfaces.api.app import app
+
+    app.dependency_overrides[get_container] = lambda: container
+    yield TestClient(app, headers={"X-Requested-With": "test"})
     app.dependency_overrides.clear()
 

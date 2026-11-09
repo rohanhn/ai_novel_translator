@@ -9,6 +9,7 @@ from functools import lru_cache
 
 from psycopg_pool import ConnectionPool
 
+from .application.auth import AuthService
 from .application.jobs import TranslationJobManager
 from .application.prefetch import PrefetchService
 from .application.services import (
@@ -25,6 +26,7 @@ from .export.txt_exporter import TxtExporter
 from .ingest.txt_loader import TxtLoader
 from .providers import create_provider
 from .providers.chain import ChainLink, ChainProvider
+from .security import verify_password
 from .storage.db import DatabaseConfigError, create_pool
 from .storage.migrator import migrate
 from .storage.postgres_repo import PostgresRepository
@@ -42,6 +44,7 @@ class Container:
     reader: ReaderService
     jobs: TranslationJobManager
     prefetch: PrefetchService
+    auth: AuthService
     repo: PostgresRepository
     quota: PostgresQuotaTracker
     provider_factory: Callable[[str | None, str | None], LLMProvider]
@@ -111,6 +114,11 @@ def build_container(
         reader=ReaderService(repo),
         jobs=jobs,
         prefetch=prefetch,
+        auth=AuthService(
+            repo,
+            settings.password_hash.get_secret_value() if settings.password_hash else None,
+            verify_password,
+        ),
         repo=repo,
         quota=quota,
         provider_factory=provider_factory,

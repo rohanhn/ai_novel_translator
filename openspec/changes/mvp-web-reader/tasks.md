@@ -50,7 +50,7 @@
 
 ## 8. API, auth và SSE
 
-- [ ] 8.1 Auth theo D7: lệnh `novel hash-password`, kiểm tra `NT_PASSWORD_HASH` lúc khởi động, login/logout, session hash trong DB, hết hạn sau 30 ngày không dùng, khóa 15 phút sau 5 lần sai theo IP (tin `X-Forwarded-For` từ `NT_TRUSTED_PROXY`), bắt buộc header `X-Requested-With` cho request thay đổi dữ liệu; kiểm tra bằng test mọi scenario spec `access-control`
+- [x] 8.1 Auth theo D7: lệnh `novel hash-password`, kiểm tra `NT_PASSWORD_HASH` lúc khởi động, login/logout, session hash trong DB, hết hạn sau 30 ngày không dùng, khóa 15 phút sau 5 lần sai theo IP (tin `X-Forwarded-For` từ `NT_TRUSTED_PROXY`), bắt buộc header `X-Requested-With` cho request thay đổi dữ liệu; kiểm tra bằng test mọi scenario spec `access-control`
 - [ ] 8.2 Middleware `X-Robots-Tag` + `/robots.txt`; kiểm tra bằng test "Crawler request"
 - [ ] 8.3 Tách router `/api` theo nhóm (library, chapters, glossary, progress/preferences, settings/quota) và nối vào services mới; mã lỗi: 401, 404, 429 kèm `reset_at`, 502 kèm loại lỗi; kiểm tra bằng test TestClient cho từng nhóm
 - [ ] 8.4 Endpoint dịch trả 202 và SSE stream theo D5 (sự kiện `waiting_for_quota`, `paragraph`, `fallback_step`, sự kiện kết thúc; keep-alive; `X-Accel-Buffering: no`); kiểm tra bằng test "Subscribe mid-way" và test hai client cùng nhận một job

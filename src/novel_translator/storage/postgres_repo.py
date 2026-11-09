@@ -258,6 +258,28 @@ class PostgresRepository:
         )
         progress.updated_at = row["updated_at"]
 
+    # --- sessions ---
+    def create_session(self, token_hash: str, now) -> None:
+        self._rowcount(
+            "INSERT INTO sessions (token_hash, created_at, last_seen_at) VALUES (%s, %s, %s)",
+            (token_hash, now, now),
+        )
+
+    def touch_session(self, token_hash: str, now, idle_after) -> bool:
+        with self._connection() as conn:
+            row = conn.execute(
+                "UPDATE sessions SET last_seen_at = %s"
+                " WHERE token_hash = %s AND last_seen_at > %s RETURNING token_hash",
+                (now, token_hash, idle_after),
+            ).fetchone()
+            if row is None:
+                conn.execute("DELETE FROM sessions WHERE token_hash = %s AND last_seen_at <= %s",
+                             (token_hash, idle_after))
+            return row is not None
+
+    def delete_session(self, token_hash: str) -> None:
+        self._rowcount("DELETE FROM sessions WHERE token_hash = %s", (token_hash,))
+
     # --- preferences ---
     def get_preferences(self) -> dict[str, object]:
         return {r["key"]: r["value"] for r in self._all("SELECT key, value FROM preferences")}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
@@ -13,8 +14,21 @@ from ...domain.models import Chapter, Novel
 from ...domain.ports import TranslationError
 from ...ingest.txt_loader import TxtLoader
 from ...providers import available_providers
+from .auth import auth_middleware
+from .auth import router as auth_router
 
-app = FastAPI(title="Novel Translator API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Spec "Missing configuration": không có mật khẩu thì không khởi động.
+    resolver = app.dependency_overrides.get(get_container, get_container)
+    resolver().auth.ensure_configured()
+    yield
+
+
+app = FastAPI(title="Novel Translator API", version="0.1.0", lifespan=lifespan)
+app.middleware("http")(auth_middleware)
+app.include_router(auth_router)
 
 
 # ---------- schemas ----------

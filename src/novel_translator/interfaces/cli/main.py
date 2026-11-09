@@ -137,12 +137,31 @@ def glossary_rm(novel_id: int, source: str):
         _fail(f"Không có thuật ngữ '{source}'")
 
 
+@app.command("hash-password")
+def hash_password_cmd():
+    """Tạo hash argon2 cho mật khẩu đăng nhập web (đặt vào NT_PASSWORD_HASH)."""
+    from ...security import hash_password
+
+    password = typer.prompt("Mật khẩu", hide_input=True, confirmation_prompt=True)
+    if len(password) < 8:
+        _fail("Mật khẩu cần ít nhất 8 ký tự.")
+    typer.echo(hash_password(password))
+    typer.secho("Đặt vào .env: NT_PASSWORD_HASH='<chuỗi trên>' (giữ dấu nháy đơn vì có ký tự $)",
+                err=True, fg=typer.colors.YELLOW)
+
+
 @app.command("serve")
 def serve(host: str = "127.0.0.1", port: int = 8000):
     """Chạy HTTP API (FastAPI)."""
     import uvicorn
 
-    _c()  # kiểm tra database + migration trước khi nhận request
+    from ...application.auth import AuthConfigError
+
+    c = _c()  # kiểm tra database + migration trước khi nhận request
+    try:
+        c.auth.ensure_configured()
+    except AuthConfigError as e:
+        _fail(str(e))
 
     uvicorn.run("novel_translator.interfaces.api.app:app", host=host, port=port)
 

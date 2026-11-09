@@ -171,6 +171,19 @@ class QuotaTracker(Protocol):
     def usage_today(self) -> list[StepUsage]: ...
 
 
+class SessionStore(Protocol):
+    """Lưu session đăng nhập theo hash của token (không bao giờ lưu token gốc)."""
+
+    def create_session(self, token_hash: str, now: datetime) -> None: ...
+
+    def touch_session(self, token_hash: str, now: datetime, idle_after: datetime) -> bool:
+        """Session tồn tại và last_seen_at > idle_after → cập nhật last_seen_at, trả True.
+        Session quá hạn bị xóa và trả False."""
+        ...
+
+    def delete_session(self, token_hash: str) -> None: ...
+
+
 class RawChapter(Protocol):
     title: str
     text: str
