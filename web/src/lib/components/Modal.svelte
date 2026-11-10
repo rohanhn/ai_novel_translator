@@ -72,8 +72,19 @@
 			inset 0 0 0 7px var(--danger-line),
 			0 24px 60px var(--shadow);
 	}
+	/* Khổ rộng: cao cố định vừa màn hình; nội dung tự cuộn bên trong (component con đặt
+	   flex: 1 + min-height: 0), nút thao tác ở cuối luôn nằm trong khung nhìn. */
 	dialog.wide {
 		width: min(900px, calc(100vw - 2 * var(--gutter)));
+		height: calc(100dvh - 48px);
+		max-height: calc(100dvh - 48px);
+		margin: 24px auto;
+		overflow: hidden;
+	}
+	dialog.wide .body {
+		box-sizing: border-box;
+		height: 100%;
+		min-height: 0;
 	}
 	@media (max-width: 640px) {
 		dialog.wide {

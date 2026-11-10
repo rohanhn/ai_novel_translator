@@ -55,6 +55,9 @@ test('xem trước: cảnh báo đúng chương, gộp, tách, lọc, lưu', asy
 	);
 	await expectNoHorizontalScroll(page);
 	await expectTouchTargets(page, 'dialog button');
+	// Nút lưu/huỷ luôn nằm trong khung nhìn, không bị danh sách chương đẩy xuống
+	const save = await dialog.getByRole('button', { name: 'Lưu vào thư viện' }).boundingBox();
+	expect(save!.y + save!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
 	await shot(page, info, 'import-preview');
 
 	// Lọc chỉ chương có cảnh báo

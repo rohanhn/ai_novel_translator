@@ -140,6 +140,7 @@
 </script>
 
 <div class="preview" aria-busy={busy}>
+	<div class="scroll">
 	<label class="field-row">
 		Tên truyện
 		<input class="field" bind:value={title} placeholder={preview.default_title} maxlength="200" />
@@ -270,6 +271,8 @@
 		{/each}
 	</ol>
 
+	</div>
+
 	{#if error}<p role="alert" class="notice notice-danger">{error}</p>{/if}
 
 	<div class="actions">
@@ -282,10 +285,24 @@
 
 <style>
 	.preview {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		min-width: 0;
+		min-height: 0;
+	}
+	.scroll {
+		flex: 1;
+		min-height: 0;
 		display: flex;
 		flex-direction: column;
 		gap: 14px;
-		min-width: 0;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		/* chừa chỗ cho viền focus của ô nhập */
+		padding: 2px;
+		margin: -2px;
 	}
 	.field-row {
 		display: flex;
@@ -443,14 +460,12 @@
 		overflow-wrap: anywhere;
 	}
 	.actions {
-		position: sticky;
-		bottom: -26px;
+		flex: none;
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: flex-end;
 		gap: 10px;
-		padding: 10px 0;
-		background: var(--paper-raised);
+		padding-top: 10px;
 		border-top: 1px solid var(--line);
 	}
 	@media (max-width: 480px) {
