@@ -67,7 +67,7 @@
 
 ## 6. Kiểm tra tổng
 
-- [ ] 6.1 Chạy toàn bộ: `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`, `cd web && npm run check && npm run check:contrast && npm run build && npm run test:e2e`, `shellcheck`, `actionlint`, `openspec validate deploy-vps-ghcr --strict`. Kiểm: tất cả pass, ghi số liệu vào commit.
+- [x] 6.1 Chạy toàn bộ: `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`, `cd web && npm run check && npm run check:contrast && npm run build && npm run test:e2e`, `shellcheck`, `actionlint`, `openspec validate deploy-vps-ghcr --strict`. Kiểm: tất cả pass, ghi số liệu vào commit.
 
 ## Workflow follow-up
 
