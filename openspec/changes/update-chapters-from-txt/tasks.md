@@ -32,7 +32,7 @@
   - các scenario "Upload for an existing novel", "Unknown novel", "Preview expired", "Mode missing", "No anchor and no usable numbers" (422 khi thiếu `start`);
   - các route yêu cầu session và header CSRF.
 - [x] 4.2 CLI `novel import <file> --into <id>` (design D7): in neo và số chương thêm; thoát mã 1 khi `needs_start` hoặc không có chương mới. Kiểm tra bằng `tests/test_cli.py` (CliRunner) theo scenario "CLI append" và "CLI cannot place the file".
-- [ ] 4.3 Cập nhật `docs/ARCHITECTURE.md`: bảng lớp thêm `domain/chapter_merge.py` và `application/chapter_update.py`; ghi chú khóa so khớp là điểm mở rộng cho nhập từ URL; README hoặc `--help` của CLI nêu `--into`. Kiểm tra bằng `grep` tên module thật trong tài liệu và `.venv/bin/novel import --help` có `--into`.
+- [x] 4.3 Cập nhật `docs/ARCHITECTURE.md`: bảng lớp thêm `domain/chapter_merge.py` và `application/chapter_update.py`; ghi chú khóa so khớp là điểm mở rộng cho nhập từ URL; README hoặc `--help` của CLI nêu `--into`. Kiểm tra bằng `grep` tên module thật trong tài liệu và `.venv/bin/novel import --help` có `--into`.
 
 ## 5. Web
 
