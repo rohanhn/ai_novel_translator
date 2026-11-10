@@ -26,7 +26,7 @@
   - hai recipient → `age` nhận hai cờ `-r`.
 
   Kiểm: pytest pass (bỏ qua có lý do nếu máy không có `bash`).
-- [ ] 3.4 Kiểm tra image thật trong điều kiện production: `docker run --read-only --tmpfs /tmp:size=128m --cap-drop ALL --security-opt no-new-privileges --user 10001:10001` với DB test và `NT_PROVIDER=echo`. Thử đăng nhập, upload TXT khoảng 50 MB, upload bìa PNG, mở chương và xem SSE chạy dần. Gặp lỗi ghi file thì sửa image (ví dụ `HOME=/tmp`) và ghi lại trong design. Đo gián đoạn khi tạo lại container trong lúc đang mở SSE: từ `docker stop` tới khi `healthy` dưới 20 giây (không tính pull), trang đọc báo mất kết nối, và mở lại chương thì dịch lại được. Kiểm: các bước trên thành công; log không có lỗi `Read-only file system`.
+- [x] 3.4 Kiểm tra image thật trong điều kiện production: `docker run --read-only --tmpfs /tmp:size=128m --cap-drop ALL --security-opt no-new-privileges --user 10001:10001` với DB test và `NT_PROVIDER=echo`. Thử đăng nhập, upload TXT khoảng 50 MB, upload bìa PNG, mở chương và xem SSE chạy dần. Gặp lỗi ghi file thì sửa image (ví dụ `HOME=/tmp`) và ghi lại trong design. Đo gián đoạn khi tạo lại container trong lúc đang mở SSE: từ `docker stop` tới khi `healthy` dưới 20 giây (không tính pull), trang đọc báo mất kết nối, và mở lại chương thì dịch lại được. Kiểm: các bước trên thành công; log không có lỗi `Read-only file system`.
 
 ## 4. CI/CD
 
