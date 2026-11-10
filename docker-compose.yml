@@ -1,21 +1,30 @@
-# Compose mẫu: app nối vào Docker network sẵn có của shared-postgres (xem docs/DEPLOY.md).
-# Biến được đọc từ .env cạnh file này (docker compose tự nạp để thay ${...}).
+# CHỈ ĐỂ BUILD VÀ CHẠY THỬ TRÊN MÁY DEV. KHÔNG dùng trên VPS: production dùng image do CI dựng
+# và mẫu trong deploy/ (compose.yaml + .env), xem docs/DEPLOY.md.
 #
-#   NT_DB_NETWORK   tên Docker network của shared-postgres (bắt buộc; tìm bằng
-#                   `docker inspect shared-postgres --format '{{json .NetworkSettings.Networks}}'`)
-#   NT_DB_HOST      hostname của Postgres trong network đó (mặc định shared-postgres)
-#   NT_DB_PASSWORD  mật khẩu role của app (bắt buộc; URL-encode nếu có ký tự đặc biệt)
+# Container chạy giống production (rootfs read-only, bỏ mọi capability, user không phải root,
+# chỉ /tmp là tmpfs) để lỗi kiểu "ghi file vào rootfs" lộ ra ngay khi thử local.
+# Khác production: build từ mã nguồn, publish cổng ra 127.0.0.1, không có Traefik.
+#
+# Biến đọc từ .env cạnh file này (docker compose tự nạp để thay ${...}):
+#   NT_DB_NETWORK    tên Docker network của shared-postgres (bắt buộc; tìm bằng
+#                    `docker inspect shared-postgres --format '{{json .NetworkSettings.Networks}}'`)
+#   NT_DB_HOST       hostname của Postgres trong network đó (mặc định shared-postgres)
+#   NT_DB_PASSWORD   mật khẩu role của app (bắt buộc; URL-encode nếu có ký tự đặc biệt)
 #   NT_DB_USER, NT_DB_NAME, NT_DB_PORT   mặc định ai_novel_translator / ai_novel_translator / 5432
 #   NT_PASSWORD_HASH hash argon2 của mật khẩu đăng nhập (bắt buộc)
-#   NT_BIND         địa chỉ:cổng publish trên host cho reverse proxy (mặc định 127.0.0.1:8000)
-#   NT_IMAGE_TAG    tag image chạy (mặc định latest; đặt tag cũ để rollback)
+#   NT_BIND          địa chỉ:cổng publish trên host (mặc định 127.0.0.1:8000)
+#   NT_IMAGE_TAG     tag image local (mặc định local)
+#   NT_VERSION       version ghi vào image khi build (mặc định dev)
 
 name: novel-translator
 
 services:
   app:
-    build: .
-    image: novel-translator:${NT_IMAGE_TAG:-latest}
+    build:
+      context: .
+      args:
+        NT_VERSION: ${NT_VERSION:-dev}
+    image: novel-translator:${NT_IMAGE_TAG:-local}
     restart: unless-stopped
     env_file:
       - path: .env
@@ -25,8 +34,16 @@ services:
       NT_DATABASE_URL: "postgresql://${NT_DB_USER:-ai_novel_translator}:${NT_DB_PASSWORD:?đặt NT_DB_PASSWORD}@${NT_DB_HOST:-shared-postgres}:${NT_DB_PORT:-5432}/${NT_DB_NAME:-ai_novel_translator}"
       # Bắt buộc: hash argon2 tạo bằng `novel hash-password` (đặt trong .env, giữ nháy đơn).
       NT_PASSWORD_HASH: ${NT_PASSWORD_HASH:?đặt NT_PASSWORD_HASH}
-      NT_COOKIE_SECURE: ${NT_COOKIE_SECURE:-true}  # false chỉ khi thử qua http://localhost
+      NT_COOKIE_SECURE: ${NT_COOKIE_SECURE:-false}  # chạy thử qua http://127.0.0.1
       NT_WEB_DIR: /app/web/build
+    # Giống deploy/compose.yaml (design D5).
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    user: "10001:10001"
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    stop_grace_period: 15s
     ports:
       - "${NT_BIND:-127.0.0.1:8000}:8000"
     networks:
