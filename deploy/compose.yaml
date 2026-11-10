@@ -1,0 +1,53 @@
+# Novel Translator trên VPS (mô hình "CI build, VPS chỉ chạy"; xem docs/DEPLOY.md).
+#
+# Chép file này và .env (từ .env.example) vào /opt/novel-translator/, rồi `chmod 600 .env`.
+# Cập nhật / rollback: sửa IMAGE_TAG trong .env → `docker compose pull && docker compose up -d`.
+#
+# Hạ tầng dùng chung phải có sẵn (repo này không dựng): Traefik v3 trên network ngoài `traefik`
+# (entrypoint HTTPS + certresolver Let's Encrypt), Postgres 16 trên network ngoài `postgres`
+# với role + database riêng cho app.
+
+name: ${APP_NAME:-novel-translator}
+
+services:
+  app:
+    # Image do CI dựng và quét; không build trên VPS. Ghim tag vX.Y.Z.
+    image: ${IMAGE_REPO:-ghcr.io/rohanhn/ai_novel_translator}:${IMAGE_TAG:?đặt IMAGE_TAG (vd. v1.4.0) trong .env}
+    restart: unless-stopped
+    # Mọi bí mật (NT_DATABASE_URL, NT_PASSWORD_HASH, GEMINI_API_KEY...) chỉ nằm trong .env.
+    env_file: .env
+
+    # Container không trạng thái, hạ quyền (design D5). Không volume: dữ liệu nằm trong Postgres.
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    user: "10001:10001"
+    # Chỉ /tmp ghi được, trong RAM: Starlette đệm upload lớn (TXT tới 50 MB) ra file tạm.
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    # uvicorn tự dừng sau tối đa 10 giây (SSE không tự đóng), dư 5 giây trước khi bị kill.
+    stop_grace_period: 15s
+    # Không có `ports`: chỉ Traefik nhận kết nối từ ngoài.
+
+    # Dạng danh sách `key=value`: compose không thay biến trong KHOÁ của mapping, nên tên
+    # router/service (theo APP_NAME) phải nằm trong chuỗi.
+    labels:
+      - traefik.enable=true
+      # App nối hai network: chỉ rõ network Traefik dùng để gọi vào (trùng network ngoài).
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik}
+      - traefik.http.routers.${APP_NAME:-novel-translator}.rule=Host(`${APP_HOST:?đặt APP_HOST (vd. truyen.example.com) trong .env}`)
+      - traefik.http.routers.${APP_NAME:-novel-translator}.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.${APP_NAME:-novel-translator}.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.services.${APP_NAME:-novel-translator}.loadbalancer.server.port=8000
+
+    networks:
+      - traefik
+      - postgres
+
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}
+  postgres:
+    external: true
+    name: ${POSTGRES_NETWORK:-postgres}

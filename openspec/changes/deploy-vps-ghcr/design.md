@@ -133,6 +133,7 @@ traefik.http.routers.${APP_NAME}.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsen
 traefik.http.services.${APP_NAME}.loadbalancer.server.port=8000
 ```
 - `APP_NAME` mặc định `novel-translator`, đổi được khi cùng VPS chạy hai bản.
+- Trong `compose.yaml`, label phải viết dạng danh sách `- key=value`: compose không thay biến trong khoá của mapping, nên dạng `key: value` sẽ để nguyên chuỗi `${APP_NAME…}` trong tên router.
 - Network `traefik` và `postgres` được khai báo `external: true`. Tên thật đọc từ `TRAEFIK_NETWORK` và `POSTGRES_NETWORK`, mặc định đúng như tên trong yêu cầu. Label `traefik.docker.network` dùng cùng biến `TRAEFIK_NETWORK`. Nếu ghi cứng `traefik` thì khi đổi tên network, Traefik sẽ chọn sai IP của container và trả 502.
 - **SSE**: Traefik v3 không buffer response theo mặc định, và tự flush với `text/event-stream`. App đã gửi keep-alive mỗi 15 giây, nên không vướng `idleTimeout` mặc định (180 giây). Docs ghi phần cấu hình mà hạ tầng cần có: entrypoint HTTPS, certresolver, không bật middleware buffering, và không đặt `respondingTimeouts.writeTimeout` ngắn trên entrypoint.
 - **Upload 50 MB**: Traefik không giới hạn body theo mặc định. Docs nhắc rằng `respondingTimeouts.readTimeout` (mặc định 60 giây ở v3) phải đủ cho upload trên mạng chậm.
