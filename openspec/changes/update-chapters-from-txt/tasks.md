@@ -28,7 +28,7 @@
 
 ## 4. API và CLI
 
-- [ ] 4.1 API theo design D5: field `novel_id` trong `POST /api/imports`, `ImportPreview.novel_id`, `POST /api/imports/{id}/update-preview`, `POST /api/imports/{id}/update`, schema `UpdatePreview`/`UpdateResult`, ánh xạ lỗi 404/410/422/409. Kiểm tra bằng `tests/test_api_chapter_update.py`:
+- [x] 4.1 API theo design D5: field `novel_id` trong `POST /api/imports`, `ImportPreview.novel_id`, `POST /api/imports/{id}/update-preview`, `POST /api/imports/{id}/update`, schema `UpdatePreview`/`UpdateResult`, ánh xạ lỗi 404/410/422/409. Kiểm tra bằng `tests/test_api_chapter_update.py`:
   - các scenario "Upload for an existing novel", "Unknown novel", "Preview expired", "Mode missing", "No anchor and no usable numbers" (422 khi thiếu `start`);
   - các route yêu cầu session và header CSRF.
 - [ ] 4.2 CLI `novel import <file> --into <id>` (design D7): in neo và số chương thêm; thoát mã 1 khi `needs_start` hoặc không có chương mới. Kiểm tra bằng `tests/test_cli.py` (CliRunner) theo scenario "CLI append" và "CLI cannot place the file".

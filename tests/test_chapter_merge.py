@@ -77,7 +77,7 @@ def positions(chs: list[cm.Incoming]) -> list[int]:
 
 def test_full_novel_re_downloaded():
     plan = cm.plan_append(stored_range(1, 500), incoming(*range(1, 521)))
-    assert plan.anchor == cm.Anchor(500, 500, "content")
+    assert plan.anchor == cm.Anchor(500, 500, "content", zh_title(500))
     assert [c.title for c in plan.to_add] == [zh_title(n) for n in range(501, 521)]
     assert not plan.needs_start and not plan.warnings and not plan.differing
 
@@ -91,7 +91,7 @@ def test_file_starts_mid_novel():
 def test_last_stored_chapter_was_a_notice_dropped_from_the_file():
     stored = stored_range(1, 10) + [cm.StoredRef(11, "请假条", "今天请假一天。")]
     plan = cm.plan_append(stored, incoming(*range(1, 14)))
-    assert plan.anchor == cm.Anchor(10, 10, "content")
+    assert plan.anchor == cm.Anchor(10, 10, "content", zh_title(10))
     assert [c.title for c in plan.to_add] == [zh_title(n) for n in (11, 12, 13)]
 
 
@@ -106,7 +106,7 @@ def test_anchor_uses_last_occurrence():
 def test_anchor_by_title_when_content_changed():
     stored = stored_range(1, 5, {5: (zh_title(5), "旧的正文。")})
     plan = cm.plan_append(stored, incoming(*range(1, 8)))
-    assert plan.anchor == cm.Anchor(5, 5, "title")
+    assert plan.anchor == cm.Anchor(5, 5, "title", zh_title(5))
     assert positions(plan.to_add) == [6, 7]
 
 
@@ -114,7 +114,7 @@ def test_content_match_preferred_over_title_match():
     # Chương cuối khớp nội dung ở vị trí 3 và khớp tiêu đề (lặp lại) ở vị trí 5.
     stored = stored_range(1, 3)
     plan = cm.plan_append(stored, incoming(1, 2, 3, 4, (zh_title(3), "另一个版本。"), 6))
-    assert plan.anchor == cm.Anchor(3, 3, "content")
+    assert plan.anchor == cm.Anchor(3, 3, "content", zh_title(3))
 
 
 def test_lookback_is_limited_to_five_chapters():

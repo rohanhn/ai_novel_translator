@@ -110,6 +110,7 @@ class Anchor:
     stored_index: int
     position: int  # vị trí trong file (Incoming.position)
     match: str  # "content" | "title"
+    title: str = ""  # tiêu đề chương đang lưu làm điểm nối
 
 
 @dataclass
@@ -141,7 +142,7 @@ def _find_last(stored: StoredRef, incoming: list[Incoming], keys: _Keys,
                                 (keys.title, keyer.title(stored.title), "title")):
         for i in range(len(incoming) - 1, -1, -1):
             if keys_of[i] == key:
-                return Anchor(stored.index, incoming[i].position, match)
+                return Anchor(stored.index, incoming[i].position, match, stored.title)
     return None
 
 
