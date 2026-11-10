@@ -9,10 +9,13 @@ Khóa nằm trong `Keyer` để nguồn khác (vd. link URL) cắm thêm khóa �
 
 from __future__ import annotations
 
+import bisect
 import hashlib
 import re
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass
+from enum import Enum
 
 from . import chapter_split
 
@@ -196,3 +199,115 @@ def plan_append(stored: list[StoredRef], incoming: list[Incoming], start: int | 
             ))
         return AppendPlan(None, False, list(incoming), warnings, [])
     return AppendPlan(None, True, [], warnings, [])
+
+
+# --- Chế độ tải lại -------------------------------------------------------------------------
+
+
+class EntryKind(str, Enum):
+    REUSE = "reuse"  # khớp nội dung: giữ bản dịch, trạng thái, cờ
+    CHANGED = "changed"  # chỉ khớp tiêu đề: nội dung mới, bỏ bản dịch
+    NEW = "new"  # không khớp chương nào
+    KEPT = "kept"  # chương cũ không có trong file, người dùng không chọn xóa
+
+
+@dataclass(frozen=True)
+class ReplaceEntry:
+    kind: EntryKind
+    incoming: Incoming | None  # None với KEPT
+    stored: StoredRef | None  # None với NEW
+
+
+@dataclass
+class ReplacePlan:
+    entries: list[ReplaceEntry]  # thứ tự mới; chương thứ i có index i + 1
+    missing: list[StoredRef]  # chương cũ không khớp chương nào trong file (giữ hoặc xóa)
+    deleted: list[StoredRef]
+
+    def count(self, kind: EntryKind) -> int:
+        return sum(1 for e in self.entries if e.kind is kind)
+
+    @property
+    def edited_lost(self) -> list[StoredRef]:
+        """Chương đã sửa tay mà nội dung gốc đổi: bản sửa tay sẽ bị bỏ."""
+        return [e.stored for e in self.entries
+                if e.kind is EntryKind.CHANGED and e.stored and e.stored.status == "edited"]
+
+    def new_index(self, stored_index: int) -> int | None:
+        for i, e in enumerate(self.entries, start=1):
+            if e.stored is not None and e.stored.index == stored_index:
+                return i
+        return None
+
+
+def _greedy_pass(incoming_keys: list, stored: list[StoredRef], key_of: Callable[[StoredRef], object],
+                 matched: dict[int, StoredRef]) -> None:
+    """Ghép chương file (theo thứ tự) với chương lưu cùng khóa còn trống. Ưu tiên chương lưu nhỏ
+    nhất lớn hơn chương lưu vừa khớp trước đó, để giữ thứ tự khi có khóa trùng."""
+    used = {s.index for s in matched.values()}
+    buckets: dict[object, list[int]] = {}
+    by_index = {s.index: s for s in stored}
+    for s in stored:
+        if s.index not in used:
+            buckets.setdefault(key_of(s), []).append(s.index)
+    for b in buckets.values():
+        b.sort()
+    last = 0
+    for i, key in enumerate(incoming_keys):
+        if i in matched:
+            last = matched[i].index
+            continue
+        cands = buckets.get(key)
+        if not cands:
+            continue
+        j = bisect.bisect_right(cands, last)
+        pick = cands.pop(j if j < len(cands) else 0)
+        matched[i] = by_index[pick]
+        last = pick
+
+
+def plan_replace(stored: list[StoredRef], incoming: list[Incoming], delete: set[int] | None = None,
+                 keyer: Keyer = DEFAULT_KEYER) -> ReplacePlan:
+    """Danh sách chương mới theo thứ tự file. `delete`: index các chương thiếu sẽ bị xóa."""
+    stored = sorted(stored, key=lambda s: s.index)
+    keys = _incoming_keys(incoming, keyer)
+    content_matched: dict[int, StoredRef] = {}
+    _greedy_pass(keys.content, stored, lambda s: keyer.content(s.source_text), content_matched)
+    matched = dict(content_matched)
+    _greedy_pass(keys.title, stored, lambda s: keyer.title(s.title), matched)
+
+    used = {s.index for s in matched.values()}
+    missing = [s for s in stored if s.index not in used]
+    delete = set(delete or ())
+    unknown = delete - {s.index for s in missing}
+    if unknown:
+        raise ValueError(f"Chỉ xóa được chương không còn trong file; không hợp lệ: {sorted(unknown)}.")
+    deleted = [s for s in missing if s.index in delete]
+    kept = [s for s in missing if s.index not in delete]
+
+    # Chương giữ lại bám sau chương cũ gần nhất phía trước còn tồn tại (đã khớp hoặc được giữ).
+    survivors = sorted(used | {s.index for s in kept})
+    attached: dict[int | None, list[StoredRef]] = {}
+    for s in kept:
+        k = bisect.bisect_left(survivors, s.index)
+        attached.setdefault(survivors[k - 1] if k > 0 else None, []).append(s)
+
+    entries: list[ReplaceEntry] = []
+
+    def emit_kept_after(anchor: int | None) -> None:
+        stack = list(reversed(attached.get(anchor, [])))
+        while stack:
+            s = stack.pop()
+            entries.append(ReplaceEntry(EntryKind.KEPT, None, s))
+            stack.extend(reversed(attached.get(s.index, [])))
+
+    emit_kept_after(None)
+    for i, inc in enumerate(incoming):
+        s = matched.get(i)
+        if s is None:
+            entries.append(ReplaceEntry(EntryKind.NEW, inc, None))
+            continue
+        kind = EntryKind.REUSE if i in content_matched else EntryKind.CHANGED
+        entries.append(ReplaceEntry(kind, inc, s))
+        emit_kept_after(s.index)
+    return ReplacePlan(entries, missing, deleted)

@@ -188,3 +188,104 @@ def test_differing_ignores_chapters_after_anchor():
     stored = stored_range(1, 3)
     plan = cm.plan_append(stored, incoming(1, 2, 3, (zh_title(1), "重复的标题。")))
     assert plan.differing == []
+
+
+# --- Replace ----------------------------------------------------------------------------------
+
+
+def layout(plan: cm.ReplacePlan) -> list[str]:
+    """Mô tả ngắn từng mục theo thứ tự mới: `reuse:3`, `changed:5`, `new@4` (vị trí file), `kept:7`."""
+    out = []
+    for e in plan.entries:
+        if e.kind is cm.EntryKind.NEW:
+            out.append(f"new@{e.incoming.position}")
+        else:
+            out.append(f"{e.kind.value}:{e.stored.index}")
+    return out
+
+
+def test_replace_identical_file_reuses_everything():
+    plan = cm.plan_replace(stored_range(1, 4), incoming(1, 2, 3, 4))
+    assert layout(plan) == ["reuse:1", "reuse:2", "reuse:3", "reuse:4"]
+    assert plan.missing == [] and plan.count(cm.EntryKind.REUSE) == 4
+
+
+def test_chapter_inserted_in_the_middle():
+    side = ("番外 雪夜", "番外正文。")
+    plan = cm.plan_replace(stored_range(1, 5), incoming(1, 2, 3, side, 4, 5))
+    assert layout(plan) == ["reuse:1", "reuse:2", "reuse:3", "new@4", "reuse:4", "reuse:5"]
+    assert plan.new_index(4) == 5
+
+
+def test_author_revised_a_chapter_and_new_chapters():
+    plan = cm.plan_replace(stored_range(1, 3), incoming(1, (zh_title(2), "改过的。"), 3, 4))
+    assert layout(plan) == ["reuse:1", "changed:2", "reuse:3", "new@4"]
+    assert plan.count(cm.EntryKind.CHANGED) == 1 and plan.count(cm.EntryKind.NEW) == 1
+
+
+def test_edited_lost_counts_changed_edited_chapters_only():
+    stored = [cm.StoredRef(1, zh_title(1), "正文1。", "edited"),
+              cm.StoredRef(2, zh_title(2), "正文2。", "edited"),
+              cm.StoredRef(3, zh_title(3), "正文3。", "translated")]
+    plan = cm.plan_replace(stored, incoming(1, (zh_title(2), "新"), (zh_title(3), "新")))
+    assert [s.index for s in plan.edited_lost] == [2]
+
+
+def test_missing_chapter_kept_by_default_after_its_predecessor():
+    stored = stored_range(1, 3) + [cm.StoredRef(4, "公告", "公告内容")] + [
+        cm.StoredRef(5, zh_title(4), "正文4。")]
+    plan = cm.plan_replace(stored, incoming(1, 2, 3, 4, 5))
+    assert layout(plan) == ["reuse:1", "reuse:2", "reuse:3", "kept:4", "reuse:5", "new@5"]
+    assert [s.index for s in plan.missing] == [4] and plan.deleted == []
+
+
+def test_missing_chapter_deleted():
+    stored = stored_range(1, 3) + [cm.StoredRef(4, "公告", "公告内容")]
+    plan = cm.plan_replace(stored, incoming(1, 2, 3), delete={4})
+    assert layout(plan) == ["reuse:1", "reuse:2", "reuse:3"]
+    assert [s.index for s in plan.deleted] == [4]
+
+
+def test_delete_only_accepts_missing_chapters():
+    with pytest.raises(ValueError):
+        cm.plan_replace(stored_range(1, 3), incoming(1, 2, 3), delete={2})
+
+
+def test_kept_chapter_at_start_and_consecutive_kept():
+    stored = [cm.StoredRef(1, "序", "序言"), cm.StoredRef(2, "公告", "公告")] + [
+        cm.StoredRef(n + 2, zh_title(n), f"正文{n}。") for n in (1, 2)] + [
+        cm.StoredRef(5, "后记A", "a"), cm.StoredRef(6, "后记B", "b")]
+    plan = cm.plan_replace(stored, incoming(1, 2, 3))
+    assert layout(plan) == ["kept:1", "kept:2", "reuse:3", "reuse:4", "kept:5", "kept:6", "new@3"]
+
+
+def test_kept_chapter_follows_predecessor_moved_elsewhere():
+    # Chương 2 bị chuyển xuống cuối trong file; chương thiếu X (index 3) đi theo chương 2.
+    stored = stored_range(1, 2) + [cm.StoredRef(3, "公告", "x")] + [cm.StoredRef(4, zh_title(3), "正文3。")]
+    plan = cm.plan_replace(stored, incoming(1, 3, 2))
+    assert layout(plan) == ["reuse:1", "reuse:4", "reuse:2", "kept:3"]
+
+
+def test_two_chapters_swapped():
+    plan = cm.plan_replace(stored_range(1, 3), incoming(1, 3, 2))
+    assert layout(plan) == ["reuse:1", "reuse:3", "reuse:2"]
+
+
+def test_duplicate_titles_in_two_volumes_match_in_order():
+    stored = [cm.StoredRef(1, "第一卷 · 第1章 起", "旧A"), cm.StoredRef(2, "第2章 承", "B"),
+              cm.StoredRef(3, "第二卷 · 第1章 起", "旧C")]
+    plan = cm.plan_replace(stored, incoming(("第1章 起", "新A"), ("第2章 承", "B"), ("第1章 起", "新C")))
+    assert layout(plan) == ["changed:1", "reuse:2", "changed:3"]
+
+
+def test_duplicate_content_matches_in_order():
+    notice = ("请假条", "今天请假。")
+    stored = [cm.StoredRef(1, *notice), *stored_range(2, 3), cm.StoredRef(4, *notice), cm.StoredRef(5, zh_title(4), "正文4。")]
+    plan = cm.plan_replace(stored, incoming(notice, 2, 3, notice, 4))
+    assert layout(plan) == ["reuse:1", "reuse:2", "reuse:3", "reuse:4", "reuse:5"]
+
+
+def test_content_match_wins_over_title_match():
+    # File có hai chương cùng tiêu đề 2: bản đúng nội dung phải lấy chương cũ 2.
+    plan = cm.plan_replace(stored_range(1, 2), incoming(1, (zh_title(2), "草稿"), 2))
+    assert layout(plan) == ["reuse:1", "new@2", "reuse:2"]
