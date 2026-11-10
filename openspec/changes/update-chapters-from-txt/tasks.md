@@ -3,7 +3,7 @@
 ## 1. Bộ so khớp thuần (domain)
 
 - [x] 1.1 Tạo `domain/chapter_merge.py` với `StoredRef`, `Incoming`, `content_key` (bỏ khoảng trắng đầu/cuối dòng, dòng trống, NFKC, sha256), `title_key` (số chương qua `chapter_split.classify_line` + phần còn lại NFKC bỏ khoảng trắng) và `Keyer` mặc định. Kiểm tra bằng `tests/test_chapter_merge.py` theo các scenario "Whitespace-only difference" và "Numeral style difference in title".
-- [ ] 1.2 Thêm `plan_append` (design D1): neo theo lần xuất hiện cuối, lùi tối đa 5 chương, khớp nội dung trước tiêu đề; không có neo thì xét số liên tiếp, `gap`, `needs_start`; `start` do người dùng chọn; `differing`. Kiểm tra bằng test cho mọi scenario của "Append anchors on the last stored chapter", "Append without an anchor", "Nothing new" và "Stored chapters differ from the file".
+- [x] 1.2 Thêm `plan_append` (design D1): neo theo lần xuất hiện cuối, lùi tối đa 5 chương, khớp nội dung trước tiêu đề; không có neo thì xét số liên tiếp, `gap`, `needs_start`; `start` do người dùng chọn; `differing`. Kiểm tra bằng test cho mọi scenario của "Append anchors on the last stored chapter", "Append without an anchor", "Nothing new" và "Stored chapters differ from the file".
 - [ ] 1.3 Thêm `plan_replace`: hai lượt ghép tham lam giữ thứ tự, các mục `reuse`/`changed`/`new`/`missing`/`kept`, vị trí chèn chương giữ lại, `delete`, thống kê và `edited_lost`. Kiểm tra bằng test cho các ca:
   - chèn chương giữa, xóa chương, đổi chỗ hai chương;
   - trùng tiêu đề ở hai quyển, trùng nội dung (hai chương "请假条");

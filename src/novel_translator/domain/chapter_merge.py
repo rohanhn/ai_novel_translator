@@ -85,3 +85,114 @@ class Keyer:
 
 
 DEFAULT_KEYER = Keyer()
+
+
+# --- Cảnh báo -------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MergeWarning:
+    code: str
+    message: str
+    params: dict
+
+
+# --- Chế độ thêm ----------------------------------------------------------------------------
+
+ANCHOR_LOOKBACK = 5  # ngoài chương cuối, thử thêm tối đa 5 chương trước nó
+
+
+@dataclass(frozen=True)
+class Anchor:
+    stored_index: int
+    position: int  # vị trí trong file (Incoming.position)
+    match: str  # "content" | "title"
+
+
+@dataclass
+class AppendPlan:
+    anchor: Anchor | None
+    needs_start: bool  # không tự xác định được: người dùng phải chọn chương bắt đầu
+    to_add: list[Incoming]
+    warnings: list[MergeWarning]
+    differing: list[StoredRef]  # chương trước điểm nối: cùng tiêu đề nhưng nội dung khác
+
+    @property
+    def nothing_new(self) -> bool:
+        return not self.needs_start and not self.to_add
+
+
+@dataclass(frozen=True)
+class _Keys:
+    content: list[str]
+    title: list[TitleKey]
+
+
+def _incoming_keys(incoming: list[Incoming], keyer: Keyer) -> _Keys:
+    return _Keys([keyer.content(i.body) for i in incoming], [keyer.title(i.title) for i in incoming])
+
+
+def _find_last(stored: StoredRef, incoming: list[Incoming], keys: _Keys,
+               keyer: Keyer) -> Anchor | None:
+    for keys_of, key, match in ((keys.content, keyer.content(stored.source_text), "content"),
+                                (keys.title, keyer.title(stored.title), "title")):
+        for i in range(len(incoming) - 1, -1, -1):
+            if keys_of[i] == key:
+                return Anchor(stored.index, incoming[i].position, match)
+    return None
+
+
+def _number_of(inc: Incoming) -> int | None:
+    return inc.heading_number if inc.heading_number is not None else title_number(inc.title)
+
+
+def _differing(stored: list[StoredRef], incoming: list[Incoming], keys: _Keys, before: int,
+               keyer: Keyer) -> list[StoredRef]:
+    """Chương đang lưu cùng tiêu đề với một chương trong file (trước vị trí `before`) nhưng nội
+    dung khác: chế độ thêm không đụng tới, chỉ báo để người dùng cân nhắc tải lại."""
+    by_title: dict[TitleKey, list[StoredRef]] = {}
+    for s in stored:
+        by_title.setdefault(keyer.title(s.title), []).append(s)
+    contents = {keyer.content(s.source_text) for s in stored}
+    found: dict[int, StoredRef] = {}
+    for i, inc in enumerate(incoming):
+        if inc.position >= before or keys.content[i] in contents:
+            continue
+        for s in by_title.get(keys.title[i], []):
+            found.setdefault(s.index, s)
+    return [found[i] for i in sorted(found)]
+
+
+def plan_append(stored: list[StoredRef], incoming: list[Incoming], start: int | None = None,
+                keyer: Keyer = DEFAULT_KEYER) -> AppendPlan:
+    """Chương sẽ thêm vào cuối truyện. `start`: vị trí trong file do người dùng chọn."""
+    stored = sorted(stored, key=lambda s: s.index)
+    warnings: list[MergeWarning] = []
+    keys = _incoming_keys(incoming, keyer)
+    if start is not None:
+        if not 1 <= start <= len(incoming):
+            raise ValueError(f"Chương bắt đầu phải trong khoảng 1..{len(incoming)}.")
+        return AppendPlan(None, False, [i for i in incoming if i.position >= start], warnings,
+                          _differing(stored, incoming, keys, start, keyer))
+    if not stored:
+        return AppendPlan(None, False, list(incoming), warnings, [])
+
+    for s in reversed(stored[-(ANCHOR_LOOKBACK + 1):]):
+        anchor = _find_last(s, incoming, keys, keyer)
+        if anchor:
+            return AppendPlan(anchor, False, [i for i in incoming if i.position > anchor.position],
+                              warnings, _differing(stored, incoming, keys, anchor.position, keyer))
+
+    last_num = next((n for s in reversed(stored) if (n := title_number(s.title)) is not None),
+                    None)
+    first_num = next((n for i in incoming if (n := _number_of(i)) is not None), None)
+    if last_num is not None and first_num is not None and first_num > last_num:
+        if first_num > last_num + 1:
+            lo, hi = last_num + 1, first_num - 1
+            missing = str(lo) if lo == hi else f"{lo}–{hi}"
+            warnings.append(MergeWarning(
+                "gap", f"File bắt đầu từ chương {first_num}; thiếu chương {missing}.",
+                {"from": lo, "to": hi},
+            ))
+        return AppendPlan(None, False, list(incoming), warnings, [])
+    return AppendPlan(None, True, [], warnings, [])
