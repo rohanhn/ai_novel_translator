@@ -135,3 +135,52 @@ test('chọn ngôn ngữ tiếng Trung thì truyện cần dịch', async ({ pag
 	expect(chapters.every((c: { status: string }) => c.status === 'pending')).toBe(true);
 	await page.request.delete(`/api/novels/${id}?confirm=true`, { headers: { 'X-Requested-With': 'e2e' } });
 });
+
+test('reader với truyện bản dịch có sẵn: nhãn, không dịch, không tín hiệu đọc, vẫn biên tập', async ({ page }, info) => {
+	await login(page);
+	const r = await page.request.post('/api/novels', {
+		headers: { 'X-Requested-With': 'e2e' },
+		multipart: {
+			file: { name: `docngay-${info.project.name}.txt`, mimeType: 'text/plain', buffer: Buffer.from(vietnameseFile()) }
+		}
+	});
+	const id = (await r.json()).id;
+	const calls: string[] = [];
+	page.on('request', (q) => {
+		if (q.method() === 'POST' && /\/(translate|reading-signal)$/.test(q.url())) calls.push(q.url());
+	});
+
+	await page.goto(`/novels/${id}`);
+	await expect(page.getByText(/Bản dịch có sẵn · 4 chương/)).toBeVisible();
+
+	await page.goto(`/novels/${id}/chapters/2`);
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Chương 2: Mở cửa');
+	await expect(page.getByText('Bản dịch có sẵn.', { exact: false })).toBeVisible();
+	await expect(page.locator('.para').first()).toContainText('Hai.');
+	await expect(page.getByRole('button', { name: 'Xem bản gốc' })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: /Dịch lại/ })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Chuẩn bị chương tiếp' })).toHaveCount(0);
+	// cuộn tới cuối (≥60%) không gửi tín hiệu đọc
+	await page.evaluate(() => {
+		window.scrollTo(0, document.body.scrollHeight);
+		window.dispatchEvent(new Event('scroll'));
+	});
+	await expectNoHorizontalScroll(page);
+	await shot(page, info, 'reader-pretranslated');
+
+	// biên tập vẫn lưu được
+	await page.getByRole('button', { name: 'Biên tập bản dịch' }).click();
+	const form = page.getByRole('form', { name: 'Biên tập chương' });
+	await form.getByLabel('Nội dung').fill('Bản sửa tay của chương hai.');
+	await form.getByRole('button', { name: 'Lưu bản sửa' }).click();
+	await expect(page.locator('.para')).toHaveText(['Bản sửa tay của chương hai.']);
+	await expect(page.getByText('Bản dịch có sẵn · đã biên tập tay.', { exact: false })).toBeVisible();
+	const ch = await (await page.request.get(`/api/novels/${id}/chapters/2`)).json();
+	expect(ch.status).toBe('edited');
+
+	await page.goto(`/novels/${id}/chapters/3`);
+	await expect(page.locator('.para').first()).toContainText('Ba.');
+	await page.waitForTimeout(500);
+	expect(calls).toEqual([]);
+	await page.request.delete(`/api/novels/${id}?confirm=true`, { headers: { 'X-Requested-With': 'e2e' } });
+});

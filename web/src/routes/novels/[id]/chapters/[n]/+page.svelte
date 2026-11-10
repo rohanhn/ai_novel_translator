@@ -36,6 +36,7 @@
 	let editing = $state(false);
 	let stop: (() => void) | null = null;
 	let tracker: ChapterTracker | null = null;
+	const pretranslated = $derived(!!novel?.pretranslated);
 	let prepareMsg = $state('');
 	let preparing = $state(false);
 
@@ -116,13 +117,18 @@
 		}
 	}
 
-	function startTracking(nid: number, n: number) {
+	function startTracking(nid: number, n: number, signals: boolean) {
 		tracker?.stop();
 		prepareMsg = '';
-		tracker = new ChapterTracker(nid, n, (d) => {
-			const text = decisionText(d);
-			if (text) prepareMsg = text;
-		});
+		tracker = new ChapterTracker(
+			nid,
+			n,
+			(d) => {
+				const text = decisionText(d);
+				if (text) prepareMsg = text;
+			},
+			signals
+		);
 		tracker.start();
 	}
 
@@ -170,8 +176,10 @@
 		// chương hiện ra (cùng lượt cập nhật DOM), không chờ thêm request nào.
 		const resumeAt = saved && saved.chapter_index === n ? saved.position : 0;
 		if (!resumeAt) saveProgress(nid, n, 0);
-		startTracking(nid, n);
-		if (ch.status === 'translated' || ch.status === 'edited') {
+		// Bản dịch có sẵn: không bao giờ gửi tới model → không tín hiệu đọc, không tự dịch.
+		const pre = !!novel?.pretranslated;
+		startTracking(nid, n, !pre);
+		if (pre || ch.status === 'translated' || ch.status === 'edited') {
 			phase = { kind: 'ready' };
 			// Mở lại đúng chỗ đã dừng (sau khi nội dung đã vẽ).
 			if (resumeAt > 0) requestAnimationFrame(() => requestAnimationFrame(() => scrollToRatio(resumeAt)));
@@ -211,7 +219,7 @@
 		</a>
 		<span class="novel">{novel?.title ?? ''}</span>
 		{#if !editing}
-			<button class="icon han" aria-label={showSource ? 'Xem bản dịch' : 'Xem bản gốc'} title={showSource ? 'Xem bản dịch' : 'Xem bản gốc'} aria-pressed={showSource} onclick={() => (showSource = !showSource)}>原</button>
+			{#if !pretranslated}<button class="icon han" aria-label={showSource ? 'Xem bản dịch' : 'Xem bản gốc'} title={showSource ? 'Xem bản dịch' : 'Xem bản gốc'} aria-pressed={showSource} onclick={() => (showSource = !showSource)}>原</button>{/if}
 			{#if hasTranslation && phase.kind === 'ready'}
 				<button class="icon" aria-label="Biên tập bản dịch" onclick={() => { showSource = false; editing = true; }}>
 					<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
@@ -237,7 +245,7 @@
 			<p role="alert" class="notice notice-danger">Không có chương {index} trong truyện này.</p>
 		{:else if chapter}
 			<div class="heading">
-				<span class="cn" lang="zh">{chapter.title}</span>
+				{#if !pretranslated}<span class="cn" lang="zh">{chapter.title}</span>{/if}
 				{#if !showSource && viTitle}<h1>{viTitle}</h1>{/if}
 				<svg class="cloud" aria-hidden="true" width="120" height="14" viewBox="0 0 120 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"
 					><path d="M0 7h44M76 7h44" /><path d="M48 9c2-4 6-4 7-1 1-3 6-4 7 0 2-3 6-3 7 1" /></svg
@@ -249,7 +257,12 @@
 			{:else}
 				{#if phase.kind === 'ready' && chapter}
 					<div class="labels">
-						{#if chapter.status === 'edited'}
+						{#if pretranslated}
+							<p class="notice notice-ok">
+								Bản dịch có sẵn{chapter.status === 'edited' ? ' · đã biên tập tay' : ''}. Truyện này được import từ file
+								tiếng Việt nên không dịch bằng model.
+							</p>
+						{:else if chapter.status === 'edited'}
 							<p class="notice notice-ok">
 								Đã biên tập tay.
 								<button class="link" onclick={() => translate({ force: true })}>Dịch lại chương</button>
@@ -261,7 +274,7 @@
 								<button class="link" onclick={() => translate({ force: true })}>Dịch lại</button>
 							</p>
 						{/if}
-						{#if chapter.glossary_outdated}
+						{#if chapter.glossary_outdated && !pretranslated}
 							<p class="notice notice-warn">
 								Bộ tên đã đổi sau khi dịch chương này.
 								<button class="link" onclick={() => translate({ force: true })}>Dịch lại</button>
@@ -326,6 +339,8 @@
 	<footer class="nav" hidden={editing}>
 		{#if prepareMsg}
 			<span class="hint" role="status">{prepareMsg}</span>
+		{:else if pretranslated}
+			<span></span>
 		{:else if next && (next.status === 'translated' || next.status === 'edited')}
 			<span class="hint">Chương {next.index} đã dịch sẵn</span>
 		{:else if next}

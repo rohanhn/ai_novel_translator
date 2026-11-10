@@ -98,10 +98,17 @@
 						<h1>{novel.title}</h1>
 						<dl>
 							<div><dt>Upload lúc</dt><dd>{fmtDate(novel.created_at)}</dd></div>
-							<div>
-								<dt>Tu vi · tiến độ dịch</dt>
-								<dd><strong class="jade">{realm(counts.done, counts.all)}</strong> · {counts.done} / {counts.all} chương đã dịch</dd>
-							</div>
+							{#if novel.pretranslated}
+								<div>
+									<dt>Nguồn</dt>
+									<dd>Bản dịch có sẵn · {counts.all} chương, đọc ngay, không dịch bằng model</dd>
+								</div>
+							{:else}
+								<div>
+									<dt>Tu vi · tiến độ dịch</dt>
+									<dd><strong class="jade">{realm(counts.done, counts.all)}</strong> · {counts.done} / {counts.all} chương đã dịch</dd>
+								</div>
+							{/if}
 							<div>
 								<dt>Đang đọc</dt>
 								<dd>

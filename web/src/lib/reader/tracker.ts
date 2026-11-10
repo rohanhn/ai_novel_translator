@@ -35,7 +35,9 @@ export class ChapterTracker {
 	constructor(
 		private novelId: number,
 		private index: number,
-		private onDecision: (d: Decision) => void
+		private onDecision: (d: Decision) => void,
+		/** false: chỉ lưu tiến độ, không gửi tín hiệu đọc (truyện bản dịch có sẵn). */
+		private signals = true
 	) {}
 
 	start(): void {
@@ -80,6 +82,7 @@ export class ChapterTracker {
 	}
 
 	private async send(signal: string, force = false): Promise<Decision> {
+		if (!this.signals) return { started: false, reason: 'pretranslated', chapter_index: null };
 		if (this.signalled && !force) return { started: false, reason: 'sent', chapter_index: null };
 		this.signalled = true;
 		const d = await post<Decision>(`/api/novels/${this.novelId}/chapters/${this.index}/reading-signal`, { signal });
