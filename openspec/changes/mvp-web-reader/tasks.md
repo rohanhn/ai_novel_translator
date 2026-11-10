@@ -80,7 +80,7 @@
 - [x] 11.1 Chạy `pytest -q` và `ruff check src tests` toàn bộ; kiểm tra pass
 - [ ] 11.2 Kịch bản end-to-end trên container local (nối `shared-postgres`, database `ai_novel_translator`) với provider `echo`: đăng nhập → upload → mở chương 1 (thấy streaming) → đọc 30 giây → chương 2 đã dịch sẵn → đồng ý một tên đề xuất → đổi tên đó → chương bị ảnh hưởng có nhãn → sửa tay một chương → xóa truyện; kiểm tra mọi bước đúng spec
 - [ ] 11.3 Smoke test với Gemini thật (key cá nhân): dịch 2 chương, xác nhận đếm lượt và nhãn model; kiểm tra màn hình quota hiển thị đúng số lượt
-- [ ] 11.4 `openspec validate mvp-web-reader --strict` pass
+- [x] 11.4 `openspec validate mvp-web-reader --strict` pass
 
 ## Workflow follow-up
 
