@@ -12,7 +12,7 @@
 - [x] 2.1 Đổi port `SourceLoader` thành `read_text(path) -> str`; `TxtLoader` chỉ đọc và giải mã (UTF-8 → GB18030), bỏ `CHAPTER_RE`; kiểm tra test loader cũ (encoding) được chuyển sang API mới và pass
 - [x] 2.2 Thêm `Novel.pretranslated`, `LibraryService.import_text(text, title, lang, plan)`: tạo truyện `zh` (chương `pending`) hoặc `vi` (chương `translated`, `translated_* = nguồn`, `provider="import"`, `glossary_version` của truyện); `import_novel(path, title, lang)` dùng `plan()` mặc định và trả cảnh báo; kiểm tra bằng test scenario "Vietnamese file with chapter headings", "Language override", "File without chapter headings", "Empty file" của `novel-library`
 - [x] 2.3 Chặn truyện `pretranslated`: `PreTranslatedError` trong `TranslationService` (mọi đường dịch và dịch lại), `PrefetchService` trả `reason="pretranslated"`; kiểm tra bằng test không có request nào tới provider `echo`, biên tập chuyển `edited`, xuất TXT đủ chương
-- [ ] 2.4 CLI `novel import --lang zh|vi`, in ngôn ngữ, số chương và cảnh báo, `unknown` → `zh` kèm cảnh báo; kiểm tra bằng `tests/test_cli.py` (CliRunner) với fixture tiếng Việt và tiếng Trung
+- [x] 2.4 CLI `novel import --lang zh|vi`, in ngôn ngữ, số chương và cảnh báo, `unknown` → `zh` kèm cảnh báo; kiểm tra bằng `tests/test_cli.py` (CliRunner) với fixture tiếng Việt và tiếng Trung
 - [ ] 2.5 Cập nhật `docs/ARCHITECTURE.md` (bảng lớp: `domain/chapter_split.py`, `application/imports.py`, `SourceLoader.read_text`; điểm mở rộng "Định dạng nhập"); kiểm tra tài liệu khớp tên module thật bằng `grep`
 
 ## 3. Bản xem trước và API

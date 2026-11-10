@@ -31,11 +31,32 @@ def _c() -> Container:
 
 
 @app.command("import")
-def import_novel(path: Path, title: str | None = typer.Option(None, help="Tên truyện")):
-    """Nhập truyện từ file .txt (tự tách chương theo 第X章)."""
-    res = _c().library.import_novel(path, title)
-    novel, n = res.novel, res.chapters
-    typer.echo(f"Đã nhập truyện #{novel.id} '{novel.title}' — {n} chương")
+def import_novel(
+    path: Path,
+    title: str | None = typer.Option(None, help="Tên truyện"),
+    lang: str | None = typer.Option(
+        None, "--lang", help="Ngôn ngữ file: zh (raw, cần dịch) | vi (bản dịch có sẵn)."
+    ),
+):
+    """Nhập truyện từ file .txt: tự tách chương (Trung/Việt) và nhận diện ngôn ngữ, lưu ngay."""
+    if lang is not None and lang not in ("zh", "vi"):
+        _fail("--lang chỉ nhận zh hoặc vi.")
+    try:
+        res = _c().library.import_novel(path, title, lang)
+    except (ValueError, OSError) as e:
+        _fail(str(e))
+    novel = res.novel
+    kind = "bản dịch có sẵn, đọc ngay" if novel.pretranslated else "raw tiếng Trung, cần dịch"
+    typer.echo(f"Đã nhập truyện #{novel.id} '{novel.title}' — {res.chapters} chương ({kind})")
+    if lang is None and res.detected_lang == "unknown":
+        typer.secho("Cảnh báo: không nhận diện được ngôn ngữ, coi là tiếng Trung (zh). "
+                    "Dùng --lang để chọn.", fg=typer.colors.YELLOW)
+    for w in res.plan.warnings:
+        typer.secho(f"Cảnh báo: {w.message}", fg=typer.colors.YELLOW)
+    for ch in res.plan.chapters:
+        for w in ch.warnings:
+            typer.secho(f"Cảnh báo · chương {ch.number} '{ch.title}': {w.message}",
+                        fg=typer.colors.YELLOW)
 
 
 @app.command("list")

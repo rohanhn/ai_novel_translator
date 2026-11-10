@@ -79,3 +79,56 @@ def test_translate_missing_key_is_clear(use, sample_txt, monkeypatch):
     nid = _import(sample_txt)
     r = runner.invoke(cli.app, ["translate", str(nid), "1"])
     assert r.exit_code == 1 and "GEMINI_API_KEY" in r.output
+
+
+# --- import: tách chương, ngôn ngữ, cảnh báo (spec novel-library) ----------------------------
+
+FIXTURES = __import__("pathlib").Path(__file__).parent / "fixtures" / "split"
+
+
+def test_import_vietnamese_fixture(use):
+    c = use(provider="echo")
+    r = runner.invoke(cli.app, ["import", str(FIXTURES / "kiem-lai-vi.txt"), "--title", "Kiếm Lai"])
+    assert r.exit_code == 0, r.output
+    assert "3 chương (bản dịch có sẵn, đọc ngay)" in r.output
+    assert "Cảnh báo" not in r.output
+    novel = c.library.list_novels()[0]
+    assert novel.title == "Kiếm Lai" and novel.pretranslated
+
+
+def test_import_chinese_fixture_prints_warnings(use):
+    c = use(provider="echo")
+    r = runner.invoke(cli.app, ["import", str(FIXTURES / "lin-dong-zh.txt")])
+    assert r.exit_code == 0, r.output
+    assert "4 chương (raw tiếng Trung, cần dịch)" in r.output
+    assert "trước tiêu đề đầu tiên" in r.output  # phần đầu file (tên truyện, tác giả)
+    assert not c.library.list_novels()[0].pretranslated
+
+
+def test_import_lang_override(use):
+    c = use(provider="echo")
+    r = runner.invoke(cli.app, ["import", str(FIXTURES / "kiem-lai-vi.txt"), "--lang", "zh"])
+    assert r.exit_code == 0, r.output
+    assert "raw tiếng Trung" in r.output
+    assert not c.library.list_novels()[0].pretranslated
+
+
+def test_import_unknown_language_warns(use, tmp_path):
+    use(provider="echo")
+    p = tmp_path / "en.txt"
+    p.write_text("Chapter 1\n" + "Hello there. " * 20 + "\nChapter 3\n" + "Bye. " * 30)
+    r = runner.invoke(cli.app, ["import", str(p)])
+    assert r.exit_code == 0, r.output
+    assert "không nhận diện được ngôn ngữ" in r.output
+    assert "chương 2 'Chapter 3'" in r.output and "Thiếu chương 2" in r.output
+
+
+def test_import_invalid_lang_and_empty_file(use, tmp_path):
+    c = use(provider="echo")
+    r = runner.invoke(cli.app, ["import", str(FIXTURES / "kiem-lai-vi.txt"), "--lang", "en"])
+    assert r.exit_code == 1 and "--lang" in r.output
+    p = tmp_path / "empty.txt"
+    p.write_text("\n\n")
+    r = runner.invoke(cli.app, ["import", str(p)])
+    assert r.exit_code == 1
+    assert c.library.list_novels() == []
