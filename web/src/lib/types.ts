@@ -1,6 +1,11 @@
 export type LibraryItem = {
 	id: number;
 	title: string;
+	author: string | null;
+	/** Giới thiệu ngắn, giữ xuống dòng. */
+	description: string | null;
+	/** Ảnh bìa đã upload (URL có phiên bản); null → bìa tự vẽ. */
+	cover_url: string | null;
 	source_lang: string;
 	target_lang: string;
 	/** Bản dịch có sẵn (import từ file tiếng Việt): đọc ngay, không dịch bằng model. */

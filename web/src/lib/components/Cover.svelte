@@ -1,13 +1,32 @@
 <script lang="ts">
-	// Bìa truyện: màu theo id, ấn son chứa chữ đầu của tên.
-	let { id, title, height = 260 }: { id: number; title: string; height?: number } = $props();
+	// Bìa truyện: ảnh đã upload nếu có (`src`); không có hoặc ảnh lỗi → bìa tự vẽ
+	// (màu theo id, ấn son chứa chữ đầu của tên). Tên luôn hiện bên cạnh nên ảnh có alt="".
+	let {
+		id,
+		title,
+		height = 260,
+		src = null
+	}: { id: number; title: string; height?: number; src?: string | null } = $props();
+	let failedSrc = $state<string | null>(null);
+	const showImage = $derived(!!src && src !== failedSrc);
 	const color = $derived(`var(--cover-${(id % 5) + 1})`);
 	const initial = $derived(title.trim().charAt(0).toUpperCase() || '?');
 </script>
 
 <div class="cover" style:--c={color} style:height="{height}px" aria-hidden="true">
-	<span class="title">{title}</span>
-	<span class="seal">{initial}</span>
+	{#if showImage}
+		<img
+			class="img"
+			{src}
+			alt=""
+			loading="lazy"
+			decoding="async"
+			onerror={() => (failedSrc = src)}
+		/>
+	{:else}
+		<span class="title">{title}</span>
+		<span class="seal">{initial}</span>
+	{/if}
 </div>
 
 <style>
@@ -23,6 +42,14 @@
 			inset 0 0 0 6px var(--bronze),
 			4px 6px 0 var(--line);
 		overflow: hidden;
+	}
+	.img {
+		position: absolute;
+		inset: 6px;
+		width: calc(100% - 12px);
+		height: calc(100% - 12px);
+		object-fit: cover;
+		display: block;
 	}
 	.title {
 		align-self: flex-start;
