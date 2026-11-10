@@ -115,10 +115,13 @@ class PostgresRepository:
         with self._connection() as conn:
             for ch in chapters:
                 row = conn.execute(
-                    "INSERT INTO chapters (novel_id, idx, title, source_text, status, updated_at)"
-                    " VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-                    (ch.novel_id, ch.index, ch.title, ch.source_text, ch.status.value,
-                     ch.updated_at),
+                    "INSERT INTO chapters (novel_id, idx, title, source_text, translated_title,"
+                    " translated_text, status, provider, model, chain_step, glossary_version,"
+                    " updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                    " RETURNING id",
+                    (ch.novel_id, ch.index, ch.title, ch.source_text, ch.translated_title,
+                     ch.translated_text, ch.status.value, ch.provider, ch.model, ch.chain_step,
+                     ch.glossary_version, ch.updated_at),
                 ).fetchone()
                 ch.id = row["id"]
         return chapters

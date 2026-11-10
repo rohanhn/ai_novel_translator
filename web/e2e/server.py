@@ -46,7 +46,7 @@ def seed(c, tmp: Path) -> None:
     def novel(name: str, n: int, prefix: str) -> int:
         p = tmp / f"{name}.txt"
         p.write_text(_chapters(n, prefix), encoding="utf-8")
-        return c.library.import_novel(p)[0].id
+        return c.library.import_novel(p).novel.id
 
     a = novel("vu-dong-can-khon", 12, "少年")
     b = novel("pham-nhan-tu-tien", 8, "修仙")

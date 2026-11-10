@@ -15,7 +15,7 @@ from novel_translator.domain.models import ChapterStatus
 
 @pytest.fixture
 def ed(container, sample_txt):
-    novel, _ = container.library.import_novel(sample_txt)
+    novel = container.library.import_novel(sample_txt).novel
     container.translation.translate_chapter(novel.id, 1)
     return novel.id, container
 

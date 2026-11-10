@@ -33,7 +33,8 @@ def _c() -> Container:
 @app.command("import")
 def import_novel(path: Path, title: str | None = typer.Option(None, help="Tên truyện")):
     """Nhập truyện từ file .txt (tự tách chương theo 第X章)."""
-    novel, n = _c().library.import_novel(path, title)
+    res = _c().library.import_novel(path, title)
+    novel, n = res.novel, res.chapters
     typer.echo(f"Đã nhập truyện #{novel.id} '{novel.title}' — {n} chương")
 
 

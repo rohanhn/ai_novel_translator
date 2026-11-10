@@ -11,6 +11,9 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+IMPORT_PROVIDER = "import"  # nhãn nguồn của chương lấy từ bản dịch có sẵn
+
+
 class ChapterStatus(str, Enum):
     PENDING = "pending"
     TRANSLATING = "translating"
@@ -33,6 +36,11 @@ class Novel:
     glossary_version: int = 0
     created_at: datetime = field(default_factory=_now)
     last_read_at: datetime | None = None
+
+    @property
+    def pretranslated(self) -> bool:
+        """Truyện import từ bản đã dịch sẵn (vd. file tiếng Việt): không bao giờ gửi tới LLM."""
+        return self.source_lang == self.target_lang
 
 
 @dataclass

@@ -47,7 +47,8 @@ def test_system_prompt_includes_glossary():
 
 
 def test_import_translate_export_flow(container, sample_txt, tmp_path):
-    novel, n = container.library.import_novel(sample_txt)
+    res = container.library.import_novel(sample_txt)
+    novel, n = res.novel, res.chapters
     assert n == 2
     container.glossary.set_term(novel.id, "林动", "Lâm Động")
 

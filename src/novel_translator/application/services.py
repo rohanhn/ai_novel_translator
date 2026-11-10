@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from ..domain import chapter_split
 from ..domain.models import (
+    IMPORT_PROVIDER,
     ChainPolicy,
     Chapter,
     ChapterStatus,
@@ -43,6 +45,21 @@ class ConfirmationRequiredError(InvalidOperationError):
     """Thao tác làm mất dữ liệu (dịch lại chương đã biên tập) cần chủ sở hữu xác nhận."""
 
 
+SUPPORTED_IMPORT_LANGS = ("zh", "vi")
+
+
+@dataclass
+class ImportResult:
+    novel: Novel
+    plan: chapter_split.SplitPlan
+    lang: str  # ngôn ngữ đã dùng để lưu
+    detected_lang: str  # zh | vi | unknown
+
+    @property
+    def chapters(self) -> int:
+        return len(self.plan.chapters)
+
+
 class LibraryService:
     def __init__(self, repo: NovelRepository, loader: SourceLoader,
                  on_delete: Callable[[int], object] | None = None):
@@ -64,17 +81,38 @@ class LibraryService:
             self.on_delete(novel_id)
         self.repo.delete_novel(novel_id)
 
-    def import_novel(self, path: Path, title: str | None = None) -> tuple[Novel, int]:
-        raw = chapter_split.plan(self.loader.read_text(path)).chapters
-        if not raw:
-            raise ValueError(f"Không tìm thấy nội dung trong {path}")
-        novel = self.repo.add_novel(Novel(title=title or path.stem))
-        chapters = [
-            Chapter(novel_id=novel.id, index=i + 1, title=r.title, source_text=r.body)
-            for i, r in enumerate(raw)
-        ]
+    def import_novel(
+        self, path: Path, title: str | None = None, lang: str | None = None
+    ) -> ImportResult:
+        """Đọc file, tách theo kết quả mặc định của `chapter_split.plan` rồi lưu ngay."""
+        return self.import_text(self.loader.read_text(path), title or path.stem, lang)
+
+    def import_text(
+        self, text: str, title: str, lang: str | None = None,
+        plan: chapter_split.SplitPlan | None = None,
+    ) -> ImportResult:
+        """Tạo truyện từ văn bản đã giải mã. `lang` None → ngôn ngữ nhận diện được (`unknown`
+        → `zh`). Truyện `vi` là bản dịch có sẵn: chương lưu ở trạng thái Đã dịch, không qua
+        LLM. `plan` None → cách tách mặc định."""
+        detected = chapter_split.detect_language(text)
+        lang = lang or (detected if detected in SUPPORTED_IMPORT_LANGS else "zh")
+        if lang not in SUPPORTED_IMPORT_LANGS:
+            raise InvalidOperationError(f"Ngôn ngữ không hỗ trợ: {lang} (chỉ zh hoặc vi).")
+        plan = plan or chapter_split.plan(text)
+        if not plan.chapters:
+            raise ValueError("Không tìm thấy nội dung trong file.")
+        novel = self.repo.add_novel(Novel(title=title, source_lang=lang, target_lang="vi"))
+        chapters = []
+        for i, r in enumerate(plan.chapters):
+            ch = Chapter(novel_id=novel.id, index=i + 1, title=r.title, source_text=r.body)
+            if novel.pretranslated:
+                ch.translated_title, ch.translated_text = r.title, r.body
+                ch.status = ChapterStatus.TRANSLATED
+                ch.provider = IMPORT_PROVIDER
+                ch.glossary_version = novel.glossary_version
+            chapters.append(ch)
         self.repo.add_chapters(chapters)
-        return novel, len(chapters)
+        return ImportResult(novel, plan, lang, detected)
 
     def get_novel(self, novel_id: int) -> Novel:
         novel = self.repo.get_novel(novel_id)

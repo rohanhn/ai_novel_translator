@@ -24,7 +24,7 @@ def make(db, monkeypatch):
 
 
 def _import(c, sample_txt):
-    novel, _ = c.library.import_novel(sample_txt)
+    novel = c.library.import_novel(sample_txt).novel
     return novel
 
 

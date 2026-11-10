@@ -40,7 +40,7 @@ async def upload(file: UploadFile, title: str | None = Form(None),
                 out.write(chunk)
         if size == 0:
             raise HTTPException(400, "File rỗng.")
-        novel, _ = c.library.import_novel(path, (title or "").strip() or None)
+        novel = c.library.import_novel(path, (title or "").strip() or None).novel
     return NovelOut.of(novel)
 
 

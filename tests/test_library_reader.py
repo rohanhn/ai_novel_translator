@@ -20,7 +20,7 @@ def _import(c, tmp_path, name: str, n_chapters: int = 3) -> int:
     p = tmp_path / f"{name}.txt"
     p.write_text("".join(f"第{i}章 标题\n内容{i}\n" for i in range(1, n_chapters + 1)),
                  encoding="utf-8")
-    novel, _ = c.library.import_novel(p)
+    novel = c.library.import_novel(p).novel
     return novel.id
 
 
