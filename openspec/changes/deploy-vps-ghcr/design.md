@@ -150,7 +150,7 @@ traefik.http.services.${APP_NAME}.loadbalancer.server.port=8000
   - `DROP TABLE|COLUMN|INDEX|CONSTRAINT|TYPE|SCHEMA|VIEW`;
   - `RENAME`, `ALTER COLUMN … TYPE`, `ALTER COLUMN … SET NOT NULL`, `TRUNCATE`, `DELETE FROM`;
   - `ADD COLUMN … NOT NULL` mà không có `DEFAULT` trong cùng mệnh đề;
-  - `ALTER TABLE … ADD CONSTRAINT`, và `ADD COLUMN … UNIQUE|CHECK|REFERENCES`, trên bảng không được tạo trong cùng file. Constraint mới trên bảng đã có có thể làm bản cũ ghi lỗi, mà test tĩnh không biết dữ liệu hay code cũ có thỏa constraint đó hay không, nên cấm hẳn. Bảng mới thì bản cũ không dùng tới, nên được phép có mọi constraint. Test lấy danh sách bảng do file tạo bằng `CREATE TABLE`.
+  - `ALTER TABLE … ADD CONSTRAINT`, `ADD COLUMN … UNIQUE|CHECK|REFERENCES`, `CREATE UNIQUE INDEX` (thực chất là một ràng buộc unique) và `ALTER COLUMN … DROP DEFAULT`, trên bảng không được tạo trong cùng file. Constraint mới trên bảng đã có có thể làm bản cũ ghi lỗi, mà test tĩnh không biết dữ liệu hay code cũ có thỏa constraint đó hay không, nên cấm hẳn. Bảng mới thì bản cũ không dùng tới, nên được phép có mọi constraint. Test lấy danh sách bảng do file tạo bằng `CREATE TABLE`.
 - Test báo tên file và câu vi phạm.
 - `001` và `002` phải qua test (đã kiểm: cả hai chỉ thêm).
 - **Quy ước cho code (không kiểm bằng test tĩnh):** code đọc cột do migration mới thêm phải chịu được `NULL`, kể cả cột có `DEFAULT`. Lý do: khi rollback, bản cũ vẫn ghi dòng mới vào bảng; cột nullable sẽ mang `NULL`, còn cột có `DEFAULT` mang giá trị mặc định chứ không phải giá trị mà logic bản mới sẽ tính. Khi nâng cấp lại, bản mới gặp các dòng đó. Muốn backfill thì làm trong code lúc đọc, hoặc bằng một migration `UPDATE … WHERE col IS NULL` (được phép vì chỉ điền giá trị, không xoá).
