@@ -54,7 +54,7 @@
 
 ## 6. Kiểm tra tích hợp
 
-- [ ] 6.1 Chạy toàn bộ `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`, `cd web && npm run check && npm run check:contrast && npm run build && npm run test:e2e`, `openspec validate update-chapters-from-txt --strict`. Kiểm tra tất cả pass.
+- [x] 6.1 Chạy toàn bộ `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`, `cd web && npm run check && npm run check:contrast && npm run build && npm run test:e2e`, `openspec validate update-chapters-from-txt --strict`. Kiểm tra tất cả pass.
 - [ ] 6.2 Thử trên app local (`NT_PROVIDER=echo`) với một truyện thật nhiều chương của người dùng:
   - thêm từ file tải lại cả bộ, và từ file chỉ có chương mới;
   - tải lại với file đã sửa vài chương.
