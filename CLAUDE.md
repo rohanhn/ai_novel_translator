@@ -6,8 +6,9 @@ Dịch truyện Trung → Việt bằng LLM. Kiến trúc: xem [docs/ARCHITECTUR
 Mọi tính năng mới đi qua OpenSpec:
 1. `/opsx:propose <mô tả yêu cầu>` → tạo proposal/design/specs/tasks trong `openspec/changes/`
 2. Review, chỉnh nếu cần (`/opsx:update`)
-3. `/opsx:apply` → hiện thực theo tasks
-4. `/opsx:archive` → gộp delta vào `openspec/specs/`
+3. `/opsx:apply` → tạo/chuyển sang nhánh local trùng tên change (từ `main`), hiện thực theo tasks, mỗi task một commit trên nhánh đó
+4. `/opsx:archive` → gộp delta vào `openspec/specs/` (làm trên nhánh của change)
+5. Đưa vào `main` bằng pull request từ nhánh của change. Không commit/merge thẳng vào `main`, không push khi chưa được yêu cầu.
 
 Ràng buộc kiến trúc nằm trong `openspec/config.yaml` (context) — tuân thủ khi propose và apply.
 

@@ -38,6 +38,14 @@ In both branches, never create the root as a side effect: do not run `openspec i
 
    Always announce: "Using change: <name>" and how to override (e.g., `/opsx:apply <other>`).
 
+   **Switch to the change branch** (project rule, before any code edit): all code for a change lives on a local branch named exactly `<name>`; it reaches `main`/`master` later only through a pull request.
+   - Run `git branch --show-current` and `git status --porcelain`.
+   - Already on `<name>` → continue.
+   - Otherwise the working tree must be clean, except untracked or modified files under this change's own planning directory (`openspec/changes/<name>/`). Anything else (other modified/untracked files, a rebase/merge in progress) → stop and ask the user; do not stash, discard or carry those files over.
+   - Branch `<name>` exists → `git switch <name>`. It does not → create it from the default branch (`main`, or `master` if there is no `main`): `git switch -c <name> <default>`. If the current branch is neither the default branch nor `<name>`, ask the user which base to use before creating.
+   - If the change's planning artifacts are uncommitted, commit them first on the change branch as their own commit: `chore(openspec): plan <name>` (only `openspec/changes/<name>/`).
+   - Announce: "Branch: <name>". Never commit task work to `main`/`master`, never push, never merge, never open a PR unless the user asks.
+
 2. **Check status to understand the schema**
    ```bash
    openspec status --change "<name>" --json
@@ -111,7 +119,7 @@ In both branches, never create the root as a side effect: do not run `openspec i
    - Before editing, confirm the checkbox at the returned `sourcePath` and `line` still matches the task description; if it does not, rerun the apply instructions and use the refreshed location
    - Mark the task complete at its returned `sourcePath` and `line`: `- [ ]` → `- [x]`
    - Rerun the apply instructions and confirm that task is now done and progress changed
-   - **Commit locally** (project rule): if the task finished with no issue (its verification passed, `.venv/bin/pytest -q` and `.venv/bin/ruff check src tests` pass), stage only the files this task touched plus the `tasks.md` checkbox, and make one local commit — message `<type>(<scope>): <summary> (task <id>)` ending with the attribution trailer. Never push. Do not ask for confirmation for this commit.
+   - **Commit locally on the change branch** (project rule): if the task finished with no issue (its verification passed, `.venv/bin/pytest -q` and `.venv/bin/ruff check src tests` pass), stage only the files this task touched plus the `tasks.md` checkbox, and make one local commit — message `<type>(<scope>): <summary> (task <id>)` ending with the attribution trailer. Never push. Do not ask for confirmation for this commit.
    - Continue to the next task immediately, without waiting for the user
 
    **Stop immediately (no commit, do not start the next task) if:**
@@ -193,7 +201,7 @@ What would you like to do?
 - If implementation reveals issues, pause and suggest artifact updates
 - Keep code changes minimal and scoped to each task
 - Update task checkbox immediately after completing each task
-- One local commit per completed task (never push); stop at the first conflict or anything needing confirmation
+- Work only on the local branch named after the change (create it from the default branch before the first code edit); one local commit per completed task on that branch (never push, never merge into main/master — that happens later via a PR); stop at the first conflict or anything needing confirmation
 - Pause on errors, blockers, or unclear requirements - don't guess
 - When a task needs work beyond what the spec describes, surface the added scope and pause - never silently narrow, defer, or simplify away specified behavior
 - Only mark a task `- [x]` when its specified behavior is fully implemented, not when it is partially done or deferred

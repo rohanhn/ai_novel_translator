@@ -40,6 +40,8 @@ rules:
 operations:
   apply:
     guidance:
+      - "Trước khi sửa code: chuyển sang nhánh local tên đúng bằng tên change (chưa có thì tạo từ `main`, hoặc `master` nếu không có `main`); working tree phải sạch, ngoại trừ thư mục `openspec/changes/<tên>/` của chính change đó (artifact chưa commit thì commit trước trên nhánh: `chore(openspec): plan <tên>`); có thay đổi khác thì dừng và hỏi"
+      - "Mọi commit của change nằm trên nhánh đó; không commit vào `main`/`master`, không push, không merge; đưa vào `main`/`master` sau này bằng pull request (chỉ tạo PR khi người dùng yêu cầu)"
       - Chạy `.venv/bin/pytest -q` và `.venv/bin/ruff check src tests` trước khi đánh dấu xong
-      - Xong một task mà không có sự cố (kiểm tra của task, pytest, ruff đều pass) → tự tạo 1 commit local cho riêng task đó (chỉ file task đã sửa + checkbox trong tasks.md, không push, không hỏi lại) rồi làm tiếp task kế ngay
+      - Xong một task mà không có sự cố (kiểm tra của task, pytest, ruff đều pass) → tự tạo 1 commit local trên nhánh của change cho riêng task đó (chỉ file task đã sửa + checkbox trong tasks.md, không push, không hỏi lại) rồi làm tiếp task kế ngay
       - Dừng ngay, không commit, không sang task kế khi gặp xung đột (git, thay đổi lạ ở file không đụng tới, spec/design/tasks mâu thuẫn nhau hoặc với code) hoặc khi cần người dùng xác nhận/quyết định
