@@ -9,7 +9,8 @@
 		role = 'dialog',
 		tone = 'default',
 		size = 'default',
-		children
+		children,
+		footer
 	}: {
 		open?: boolean;
 		title: string;
@@ -19,6 +20,8 @@
 		/** `wide`: khung rộng trên desktop, toàn màn hình trên điện thoại. */
 		size?: 'default' | 'wide';
 		children: Snippet;
+		/** Thanh nút cố định ở đáy: thân hộp cuộn riêng, nút luôn nằm trong khung nhìn. */
+		footer?: Snippet;
 	} = $props();
 
 	let el: HTMLDialogElement | undefined = $state();
@@ -34,6 +37,7 @@
 <dialog
 	bind:this={el}
 	class="{tone} {size}"
+	class:has-footer={!!footer}
 	{role}
 	aria-labelledby="{id}-h"
 	onclose={() => (open = false)}
@@ -49,6 +53,9 @@
 		</header>
 		{@render children()}
 	</div>
+	{#if footer}
+		<footer>{@render footer()}</footer>
+	{/if}
 </dialog>
 
 <style>
@@ -95,6 +102,42 @@
 			margin: 0;
 		}
 	}
+	/* Có footer: hộp không bao giờ cao quá khung nhìn (tính cả lề trên); thân cuộn bên trong,
+	   footer đứng yên ở đáy. Chỉ đặt display khi [open] để hộp đóng vẫn ẩn. */
+	dialog.has-footer {
+		max-height: calc(100dvh - max(48px, 8vh) - 24px);
+		overflow: hidden;
+	}
+	dialog.has-footer[open] {
+		display: flex;
+		flex-direction: column;
+	}
+	dialog.has-footer .body {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+	}
+	footer {
+		flex: none;
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		gap: 10px;
+		margin: 0 7px 7px;
+		padding: 14px 21px;
+		border-top: 1px solid var(--line);
+		background: var(--paper-raised);
+	}
+	@media (max-width: 640px) {
+		dialog.has-footer {
+			width: 100vw;
+			max-width: 100vw;
+			height: 100dvh;
+			max-height: 100dvh;
+			margin: 0;
+		}
+	}
 	dialog::backdrop {
 		background: var(--scrim);
 	}
@@ -134,6 +177,9 @@
 	@media (max-width: 480px) {
 		.body {
 			padding: 22px 18px;
+		}
+		footer {
+			padding: 12px 11px;
 		}
 		h2 {
 			font-size: 24px;
