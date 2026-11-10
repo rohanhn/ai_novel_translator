@@ -141,6 +141,13 @@ def _vi_number(m: re.Match) -> int | None:
 
 def classify_line(line: str) -> tuple[HeadingKind, int | None] | None:
     """Trả về (loại, số) nếu dòng là tiêu đề đứng riêng, ngược lại None."""
+    parts = heading_parts(line)
+    return (parts[0], parts[1]) if parts else None
+
+
+def heading_parts(line: str) -> tuple[HeadingKind, int | None, str] | None:
+    """Như `classify_line`, kèm phần tên sau số/từ khóa (vd. "第五百章 风起" → "风起" có
+    khoảng trắng/dấu phân cách đầu). Dùng để so khớp tiêu đề khi cập nhật chương."""
     text = unicodedata.normalize("NFC", line.strip())
     if not text or len(text) > MAX_HEADING_CHARS:
         return None
@@ -161,7 +168,7 @@ def classify_line(line: str) -> tuple[HeadingKind, int | None] | None:
             rest_ok = _zh_special_rest_ok if numbered == "zh" else _vi_special_rest_ok
             if not rest_ok(rest) or _ends_like_sentence(rest):
                 return None
-            return kind, None
+            return kind, None, rest
         if _ends_like_sentence(rest):
             return None
         if numbered == "vi":
@@ -170,7 +177,7 @@ def classify_line(line: str) -> tuple[HeadingKind, int | None] | None:
             number = parse_number(m.group("num"))
         if number is None:
             return None
-        return kind, number
+        return kind, number, rest
     return None
 
 
