@@ -18,6 +18,6 @@ Ràng buộc kiến trúc nằm trong `openspec/config.yaml` (context) — tuân
 - Test: `.venv/bin/pytest -q` (cần Postgres local + `NT_TEST_DATABASE_URL`; không bao giờ gọi LLM thật trong test, dùng provider `echo`)
 - Lint: `.venv/bin/ruff check src tests`
 - Web: `cd web && npm run build` (ra `web/build`, FastAPI tự phục vụ); `npm run check`, `npm run check:contrast`, `npm run test:e2e` (Playwright, cần build trước)
-- CLI: `.venv/bin/novel --help`; app: `.venv/bin/novel serve` → http://127.0.0.1:8000 (API docs `/docs`, cần đăng nhập)
+- CLI: `.venv/bin/novel --help`; `.venv/bin/novel migrate` chỉ áp dụng migration (migration phải chỉ thêm, xem docs/DEPLOY.md); app: `.venv/bin/novel serve` → http://127.0.0.1:8000 (API docs `/docs`, cần đăng nhập)
 - Dev UI không tốn quota: `NT_PROVIDER=echo NT_ECHO_DELAY=0.2 .venv/bin/novel serve`
-- Docker/triển khai: xem [docs/DEPLOY.md](docs/DEPLOY.md)
+- Triển khai: CI (`.github/workflows/ci.yml`) build + quét Trivy + đẩy GHCR; VPS chỉ chạy `deploy/compose.yaml` + `.env`, xem [docs/DEPLOY.md](docs/DEPLOY.md). `docker-compose.yml` ở gốc chỉ để chạy thử local

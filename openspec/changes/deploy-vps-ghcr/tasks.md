@@ -53,7 +53,7 @@
 
 ## 5. Tài liệu
 
-- [ ] 5.1 Viết lại `docs/DEPLOY.md` cho mô hình mới (D10):
+- [x] 5.1 Viết lại `docs/DEPLOY.md` cho mô hình mới (D10):
   - yêu cầu đối với hạ tầng: Traefik v3 (entrypoint, certresolver, timeout, không buffer), Postgres 16, hai network;
   - tạo role và DB;
   - `/opt/novel-translator` với `chmod 600 .env`; `docker login ghcr.io` nếu package private;
