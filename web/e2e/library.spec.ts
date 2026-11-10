@@ -47,7 +47,7 @@ test('upload: báo lỗi file quá 50 MB, upload thành công rồi xoá có xá
 	writeFileSync(big, Buffer.alloc(50 * 1024 * 1024 + 1, 0x41));
 	await dialog.locator('input[type=file]').setInputFiles(big);
 	await expect(dialog.getByRole('alert')).toContainText('File quá lớn');
-	await expect(dialog.getByRole('button', { name: 'Upload' })).toBeDisabled();
+	await expect(dialog.getByRole('button', { name: 'Xem trước' })).toBeDisabled();
 	await expectNoHorizontalScroll(page);
 	await shot(page, info, 'upload-too-large');
 
@@ -57,8 +57,10 @@ test('upload: báo lỗi file quá 50 MB, upload thành công rồi xoá có xá
 		mimeType: 'text/plain',
 		buffer: Buffer.from('第1章 开始\n林动。\n第2章 继续\n修炼。\n')
 	});
+	await dialog.getByRole('button', { name: 'Xem trước' }).click();
 	await expect(dialog.getByPlaceholder(name)).toBeVisible(); // tên mặc định = tên file
-	await dialog.getByRole('button', { name: 'Upload' }).click();
+	await expect(dialog.getByText('2 chương')).toBeVisible();
+	await dialog.getByRole('button', { name: 'Lưu vào thư viện' }).click();
 	await page.waitForURL(/\/novels\/\d+$/);
 
 	await page.goto('/');

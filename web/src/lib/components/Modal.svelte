@@ -8,6 +8,7 @@
 		subtitle,
 		role = 'dialog',
 		tone = 'default',
+		size = 'default',
 		children
 	}: {
 		open?: boolean;
@@ -15,6 +16,8 @@
 		subtitle?: string;
 		role?: 'dialog' | 'alertdialog';
 		tone?: 'default' | 'danger';
+		/** `wide`: khung rộng trên desktop, toàn màn hình trên điện thoại. */
+		size?: 'default' | 'wide';
 		children: Snippet;
 	} = $props();
 
@@ -30,7 +33,7 @@
 
 <dialog
 	bind:this={el}
-	class={tone}
+	class="{tone} {size}"
 	{role}
 	aria-labelledby="{id}-h"
 	onclose={() => (open = false)}
@@ -68,6 +71,18 @@
 			inset 0 0 0 6px var(--paper-raised),
 			inset 0 0 0 7px var(--danger-line),
 			0 24px 60px var(--shadow);
+	}
+	dialog.wide {
+		width: min(900px, calc(100vw - 2 * var(--gutter)));
+	}
+	@media (max-width: 640px) {
+		dialog.wide {
+			width: 100vw;
+			max-width: 100vw;
+			height: 100dvh;
+			max-height: 100dvh;
+			margin: 0;
+		}
 	}
 	dialog::backdrop {
 		background: var(--scrim);

@@ -1,30 +1,30 @@
 <script lang="ts">
-	import { ApiError, api } from '../api.js';
+	// Upload hai bước (design D5): chọn file → xem trước cách tách chương → xác nhận mới lưu.
 	import Modal from '../components/Modal.svelte';
 	import { formatBytes } from '../realm.js';
-	import type { Novel } from '../types.js';
-
-	const MAX_BYTES = 50 * 1024 * 1024;
+	import type { ImportPreview as Preview, Novel } from '../types.js';
+	import ImportPreview from './ImportPreview.svelte';
+	import { MAX_UPLOAD_BYTES, createImport, discardImport, uploadErrorMessage } from './imports.js';
 
 	let { open = $bindable(false), onuploaded }: { open?: boolean; onuploaded: (n: Novel) => void } =
 		$props();
 
 	let file = $state<File | null>(null);
-	let title = $state('');
+	let preview = $state<Preview | null>(null);
 	let error = $state('');
 	let busy = $state(false);
-	let input: HTMLInputElement | undefined = $state();
 
-	const tooLarge = $derived(!!file && file.size > MAX_BYTES);
-	const placeholder = $derived(file ? file.name.replace(/\.txt$/i, '') : 'Tên file');
+	const tooLarge = $derived(!!file && file.size > MAX_UPLOAD_BYTES);
 
 	$effect(() => {
 		if (!open) reset();
 	});
 
 	function reset() {
+		// Đóng khi đang xem trước mà chưa lưu = huỷ: bỏ bản xem trước ở server.
+		if (preview) discardImport(preview.id);
 		file = null;
-		title = '';
+		preview = null;
 		error = '';
 		busy = false;
 	}
@@ -39,65 +39,71 @@
 		if (!file || tooLarge) return;
 		busy = true;
 		error = '';
-		const form = new FormData();
-		form.append('file', file);
-		if (title.trim()) form.append('title', title.trim());
 		try {
-			const novel = await api<Novel>('/api/novels', { method: 'POST', body: form });
-			open = false;
-			onuploaded(novel);
+			preview = await createImport(file);
 		} catch (err) {
-			if (err instanceof ApiError && err.status === 413) {
-				error = 'File quá lớn. Giới hạn là 50 MB. Chưa có truyện nào được tạo.';
-			} else {
-				error = err instanceof ApiError ? err.message : 'Không upload được. Thử lại sau.';
-			}
+			error = uploadErrorMessage(err);
 		} finally {
 			busy = false;
 		}
 	}
+
+	function saved(novel: Novel) {
+		preview = null; // đã lưu: không discard
+		open = false;
+		onuploaded(novel);
+	}
+
+	function expired(message: string) {
+		preview = null;
+		error = message;
+	}
 </script>
 
-<Modal bind:open title="Thu nạp điển tịch" subtitle="Upload truyện .txt">
-	<form onsubmit={submit} class="form">
-		<label class="drop" class:bad={tooLarge}>
-			{#if file}
-				<span class="name">{file.name}</span>
-				<span class="meta">{formatBytes(file.size)} · bấm để chọn file khác</span>
-			{:else}
-				<span class="name">Chọn file .txt</span>
-				<span class="meta">Bấm để chọn file từ máy</span>
+<Modal
+	bind:open
+	title={preview ? 'Xem trước' : 'Thu nạp điển tịch'}
+	subtitle={preview ? 'Kiểm tra cách tách chương trước khi lưu' : 'Upload truyện .txt'}
+	size={preview ? 'wide' : 'default'}
+>
+	{#if preview}
+		<ImportPreview bind:preview onsaved={saved} onexpired={expired} oncancel={() => (open = false)} />
+	{:else}
+		<form onsubmit={submit} class="form">
+			<label class="drop" class:bad={tooLarge}>
+				{#if file}
+					<span class="name">{file.name}</span>
+					<span class="meta">{formatBytes(file.size)} · bấm để chọn file khác</span>
+				{:else}
+					<span class="name">Chọn file .txt</span>
+					<span class="meta">Bấm để chọn file từ máy</span>
+				{/if}
+				<input type="file" accept=".txt,text/plain" onchange={pick} />
+			</label>
+
+			{#if tooLarge && file}
+				<p role="alert" class="notice notice-danger">
+					<strong>File quá lớn.</strong> Giới hạn là 50 MB, file này {formatBytes(file.size)}. Chưa
+					có truyện nào được tạo. Hãy tách file rồi upload lại.
+				</p>
 			{/if}
-			<input bind:this={input} type="file" accept=".txt,text/plain" onchange={pick} />
-		</label>
 
-		{#if tooLarge && file}
-			<p role="alert" class="notice notice-danger">
-				<strong>File quá lớn.</strong> Giới hạn là 50 MB, file này {formatBytes(file.size)}. Chưa có
-				truyện nào được tạo. Hãy tách file rồi upload lại.
+			<p class="help">
+				Tối đa 50 MB, mã hoá UTF-8 hoặc GB18030. File có thể gộp nhiều chương: app tự tách theo
+				tiêu đề (第X章, Chương N, Hồi N…) và nhận ra file tiếng Trung hay bản dịch tiếng Việt có
+				sẵn. Bạn sẽ được xem trước và chỉnh trước khi lưu.
 			</p>
-		{/if}
 
-		<label class="title">
-			Tên truyện
-			<span class="hint">Không bắt buộc. Để trống sẽ dùng tên file.</span>
-			<input class="field" bind:value={title} {placeholder} maxlength="200" />
-		</label>
+			{#if error}<p role="alert" class="notice notice-danger">{error}</p>{/if}
 
-		<p class="help">
-			Tối đa 50 MB. Tự nhận diện mã hoá UTF-8 hoặc GB18030 và tách chương theo 第X章, 第X回, 第X节,
-			第X卷.
-		</p>
-
-		{#if error}<p role="alert" class="notice notice-danger">{error}</p>{/if}
-
-		<div class="actions">
-			<button type="button" class="btn" onclick={() => (open = false)}>Huỷ</button>
-			<button type="submit" class="btn btn-primary" disabled={!file || tooLarge || busy}>
-				{busy ? 'Đang upload…' : 'Upload'}
-			</button>
-		</div>
-	</form>
+			<div class="actions">
+				<button type="button" class="btn" onclick={() => (open = false)}>Huỷ</button>
+				<button type="submit" class="btn btn-primary" disabled={!file || tooLarge || busy}>
+					{busy ? 'Đang phân tích…' : 'Xem trước'}
+				</button>
+			</div>
+		</form>
+	{/if}
 </Modal>
 
 <style>
@@ -137,18 +143,10 @@
 		overflow-wrap: anywhere;
 	}
 	.meta,
-	.hint,
 	.help {
 		font-size: 13px;
 		font-weight: 400;
 		color: var(--ink-muted);
-	}
-	.title {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		font-size: 14px;
-		font-weight: 600;
 	}
 	.help {
 		margin: 0;

@@ -1,6 +1,10 @@
 export type LibraryItem = {
 	id: number;
 	title: string;
+	source_lang: string;
+	target_lang: string;
+	/** Bản dịch có sẵn (import từ file tiếng Việt): đọc ngay, không dịch bằng model. */
+	pretranslated: boolean;
 	glossary_version: number;
 	created_at: string;
 	last_read_at: string | null;
@@ -38,3 +42,33 @@ export type Suggestion = {
 	created_at: string;
 };
 export type Term = { source_term: string; target_term: string; note: string | null };
+
+// --- Import TXT có xem trước (/api/imports) ---
+export type SplitWarning = { code: string; message: string; params: Record<string, unknown> };
+export type ImportChapter = {
+	number: number;
+	start_line: number;
+	end_line: number;
+	title: string;
+	chars: number;
+	excerpt: string;
+	warnings: SplitWarning[];
+};
+export type ImportPreview = {
+	id: string;
+	filename: string;
+	default_title: string;
+	detected_lang: 'zh' | 'vi' | 'unknown';
+	line_count: number;
+	boundaries: number[];
+	front_matter: {
+		start_line: number;
+		end_line: number;
+		chars: number;
+		excerpt: string;
+		keep: boolean;
+	} | null;
+	chapters: ImportChapter[];
+	warnings: SplitWarning[];
+};
+export type ImportLang = 'zh' | 'vi';
