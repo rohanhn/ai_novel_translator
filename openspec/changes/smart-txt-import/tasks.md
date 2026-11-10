@@ -30,7 +30,7 @@
 
 - [x] 5.1 Chạy `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`, `cd web && npm run check && npm run build && npm run test:e2e` toàn bộ; kiểm tra tất cả pass
 - [ ] 5.2 Thử trên app local với một file TXT thật nhiều chương của người dùng (tiếng Việt) và một raw tiếng Trung: xem trước, chỉnh, lưu, đọc; kiểm tra số chương và tiêu đề khớp file, không có request LLM cho truyện tiếng Việt (quota bước 1 không đổi)
-- [ ] 5.3 `openspec validate smart-txt-import --strict` pass
+- [x] 5.3 `openspec validate smart-txt-import --strict` pass
 
 ## Workflow follow-up
 
