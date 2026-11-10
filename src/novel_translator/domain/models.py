@@ -36,6 +36,13 @@ class Novel:
     glossary_version: int = 0
     created_at: datetime = field(default_factory=_now)
     last_read_at: datetime | None = None
+    author: str | None = None
+    description: str | None = None  # giới thiệu ngắn, giữ xuống dòng
+    cover_updated_at: datetime | None = None  # None = chưa có ảnh bìa (dùng bìa tự vẽ)
+
+    @property
+    def has_cover(self) -> bool:
+        return self.cover_updated_at is not None
 
     @property
     def pretranslated(self) -> bool:

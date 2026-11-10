@@ -22,6 +22,7 @@ from .models import (
     StepUsage,
     SuggestionStatus,
 )
+from .novel_details import CoverImage
 
 
 class TranslationError(RuntimeError):
@@ -156,6 +157,20 @@ class NovelRepository(Protocol):
     def get_preferences(self) -> dict[str, object]: ...
     def set_preference(self, key: str, value: object) -> None: ...
 
+    def update_novel_details(self, novel_id: int, fields: dict[str, str | None]) -> Novel | None:
+        """Cập nhật các cột `title`/`author`/`description` có trong `fields`; trả truyện mới."""
+        ...
+
+    def set_cover(self, novel_id: int, image: CoverImage) -> Novel | None:
+        """Lưu (thay) ảnh bìa và đặt `cover_updated_at = now()` trong cùng transaction."""
+        ...
+
+    def get_cover(self, novel_id: int) -> CoverImage | None: ...
+
+    def delete_cover(self, novel_id: int) -> bool:
+        """Xoá ảnh bìa, đặt `cover_updated_at = NULL`. Không có ảnh → False."""
+        ...
+
 
 @runtime_checkable
 class QuotaTracker(Protocol):
@@ -190,6 +205,20 @@ class SourceLoader(Protocol):
     def read_text(self, path: Path) -> str: ...
 
     def decode(self, data: bytes) -> str: ...
+
+
+class CoverImageProcessor(Protocol):
+    """Kiểm tra và chuẩn hoá ảnh bìa: chỉ JPG/PNG/WebP thật, thu nhỏ, bỏ metadata.
+    Lỗi → `InvalidImageError`."""
+
+    def process(self, data: bytes) -> CoverImage: ...
+
+
+class CoverImageFetcher(Protocol):
+    """Tải byte ảnh từ một link http/https công khai, chặn địa chỉ nội bộ.
+    Lỗi → `CoverFetchError`."""
+
+    def fetch(self, url: str) -> bytes: ...
 
 
 class Exporter(Protocol):
