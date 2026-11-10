@@ -17,7 +17,7 @@
 
 ## 3. Bản xem trước và API
 
-- [ ] 3.1 `application/imports.py` `ImportDraftService` (dict + lock, id `token_urlsafe(16)`, hết hạn 60 phút từ lần dùng cuối, tối đa 3 draft, `create/adjust/lines/commit/discard`, `DraftExpiredError`) và nối trong `container.py`; kiểm tra bằng test với đồng hồ giả: hết hạn, bỏ draft cũ nhất khi tạo thứ 4, commit xóa draft, commit lần hai báo hết hạn
+- [x] 3.1 `application/imports.py` `ImportDraftService` (dict + lock, id `token_urlsafe(16)`, hết hạn 60 phút từ lần dùng cuối, tối đa 3 draft, `create/adjust/lines/commit/discard`, `DraftExpiredError`) và nối trong `container.py`; kiểm tra bằng test với đồng hồ giả: hết hạn, bỏ draft cũ nhất khi tạo thứ 4, commit xóa draft, commit lần hai báo hết hạn
 - [ ] 3.2 Router `interfaces/api/routers/imports.py` theo design D3 (POST, PUT, GET lines `count` ≤500, POST commit, DELETE; 410 khi hết hạn; dùng chung kiểm tra 50 MB/file rỗng/đuôi `.txt` với upload cũ); `POST /api/novels` nhận `lang`; `NovelOut` thêm `source_lang`, `pretranslated`; preflight `POST .../translate` trả 409 cho truyện `pretranslated`; kiểm tra bằng `tests/test_api_imports.py` phủ các scenario của "Upload novel from the web" (gồm không lưu gì trước khi xác nhận, gộp tiêu đề nhầm, preview hết hạn sau khi tạo container mới, file 60 MB) và "Pre-translated novels never reach an LLM"; route yêu cầu session và header CSRF
 
 ## 4. Web

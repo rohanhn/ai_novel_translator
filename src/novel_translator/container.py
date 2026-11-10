@@ -10,6 +10,7 @@ from functools import lru_cache
 from psycopg_pool import ConnectionPool
 
 from .application.auth import AuthService
+from .application.imports import ImportDraftService
 from .application.jobs import TranslationJobManager
 from .application.prefetch import PrefetchService
 from .application.services import (
@@ -37,6 +38,7 @@ from .storage.quota_repo import PostgresQuotaTracker
 class Container:
     settings: Settings
     library: LibraryService
+    imports: ImportDraftService
     glossary: GlossaryService
     translation: TranslationService
     exports: ExportService
@@ -104,9 +106,12 @@ def build_container(
     # Thread của job manager chỉ khởi động ở lần submit đầu tiên.
     jobs = TranslationJobManager(translation, autostart=False)
     prefetch = PrefetchService(repo, jobs, quota)
+    loader = TxtLoader()
+    library = LibraryService(repo, loader, on_delete=jobs.cancel_queued_for_novel)
     return Container(
         settings=settings,
-        library=LibraryService(repo, TxtLoader(), on_delete=jobs.cancel_queued_for_novel),
+        library=library,
+        imports=ImportDraftService(library, loader),
         glossary=GlossaryService(repo),
         translation=translation,
         exports=ExportService(repo, {"txt": TxtExporter()}),

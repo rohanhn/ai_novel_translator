@@ -24,6 +24,9 @@ class TxtLoader:
     def __init__(self, encoding: str | None = None):
         self.encoding = encoding
 
+    def decode(self, data: bytes) -> str:
+        return decode(data, self.encoding)
+
     def read_text(self, path: Path) -> str:
         try:
             return decode(path.read_bytes(), self.encoding)

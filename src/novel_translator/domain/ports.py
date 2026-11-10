@@ -189,6 +189,8 @@ class SourceLoader(Protocol):
 
     def read_text(self, path: Path) -> str: ...
 
+    def decode(self, data: bytes) -> str: ...
+
 
 class Exporter(Protocol):
     format: str
