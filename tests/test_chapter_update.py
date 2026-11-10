@@ -6,8 +6,12 @@ import pytest
 
 from novel_translator.application.chapter_update import (
     LanguageMismatchError,
+    NothingNewError,
+    StalePreviewError,
+    StartRequiredError,
     UpdateMode,
 )
+from novel_translator.application.imports import DraftExpiredError
 from novel_translator.domain.models import ChapterStatus, ReadingProgress
 
 
@@ -111,3 +115,79 @@ def test_invalid_mode_rejected(container, novel):
     d = draft_for(container, novel, zh_txt([6]))
     with pytest.raises(ValueError):
         container.chapter_updates.preview(d.id, "merge", d.plan.boundaries)
+
+
+# --- apply: append ----------------------------------------------------------------------------
+
+
+def apply_with_preview(container, draft, mode, **kw):
+    svc = container.chapter_updates
+    p = svc.preview(draft.id, mode, draft.plan.boundaries, **kw)
+    return svc.apply(draft.id, mode, draft.plan.boundaries, revision=p.revision, **kw)
+
+
+def test_chapters_appended(container, novel):
+    repo = container.repo
+    repo.save_progress(ReadingProgress(novel.id, 2, 0.3))
+    before = snapshot(repo, novel.id)
+    d = draft_for(container, novel, zh_txt(range(1, 9), revised={3}))
+    res = apply_with_preview(container, d, "append")
+    assert (res.added, res.chapter_count) == (3, 8)
+    chs = repo.list_chapters(novel.id)
+    assert snapshot(repo, novel.id)[:5] == before  # chương cũ không đổi (kể cả chương 3 đã sửa)
+    assert [(c.index, c.title, c.status) for c in chs[5:]] == [
+        (6, "第6章 标题6", ChapterStatus.PENDING), (7, "第7章 标题7", ChapterStatus.PENDING),
+        (8, "第8章 标题8", ChapterStatus.PENDING)]
+    assert "林动第7章" in chs[6].source_text and chs[6].translated_text is None
+    p = repo.get_progress(novel.id)
+    assert (p.chapter_index, p.position) == (2, 0.3)  # thêm chương không đổi tiến độ đọc
+    with pytest.raises(DraftExpiredError):  # draft đã xóa sau khi áp
+        container.imports.get(d.id)
+
+
+def test_append_to_a_vietnamese_novel_makes_no_llm_request(container):
+    body = "Trần Bình An ngồi trước cửa ngõ, nhìn mưa xuân rơi trên mái hiên. " * 3
+
+    def vi(ns) -> bytes:
+        return "\n".join(f"Chương {n}: Tên {n}\n{body}{n}" for n in ns).encode()
+
+    novel = container.library.import_bytes(vi(range(1, 4)), "Kiếm Lai", "vi").novel
+    d = container.imports.create("moi.txt", vi(range(1, 9)), novel_id=novel.id)
+    res = apply_with_preview(container, d, "append")
+    assert res.added == 5
+    new = container.repo.list_chapters(novel.id)[3:]
+    assert all(c.status == ChapterStatus.TRANSLATED and c.provider == "import" for c in new)
+    assert new[0].translated_text == new[0].source_text
+    assert not container.jobs.has_jobs_for_novel(novel.id)
+    assert container.quota.usage_today() == []
+
+
+def test_append_rejected_when_chapter_translated_after_preview(container, novel):
+    repo = container.repo
+    d = draft_for(container, novel, zh_txt(range(1, 7)))
+    p = container.chapter_updates.preview(d.id, "append", d.plan.boundaries)
+    ch = repo.get_chapter(novel.id, 1)
+    ch.translated_title, ch.translated_text, ch.status = "C1", "Dịch", ChapterStatus.TRANSLATED
+    repo.update_chapter(ch)
+    before = snapshot(repo, novel.id)
+    with pytest.raises(StalePreviewError):
+        container.chapter_updates.apply(d.id, "append", d.plan.boundaries, revision=p.revision)
+    assert snapshot(repo, novel.id) == before
+    assert container.imports.get(d.id)  # draft còn để xem lại
+
+
+def test_append_nothing_new(container, novel):
+    d = draft_for(container, novel, zh_txt(range(1, 6)))
+    with pytest.raises(NothingNewError):
+        apply_with_preview(container, d, "append")
+
+
+def test_append_needs_start_then_owner_picks(container, novel):
+    d = draft_for(container, novel, "番外 一\n番外内容一\n番外 二\n番外内容二".encode())
+    p = container.chapter_updates.preview(d.id, "append", d.plan.boundaries)
+    assert p.append.needs_start
+    with pytest.raises(StartRequiredError):
+        container.chapter_updates.apply(d.id, "append", d.plan.boundaries, revision=p.revision)
+    res = apply_with_preview(container, d, "append", start=2)
+    assert res.added == 1
+    assert container.repo.get_chapter(novel.id, 6).title == "番外 二"

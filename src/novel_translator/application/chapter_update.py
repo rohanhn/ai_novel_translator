@@ -17,7 +17,7 @@ from ..domain.models import Chapter, Novel
 from ..domain.ports import NovelRepository
 from .imports import Draft, ImportDraftService
 from .jobs import TranslationJobManager
-from .services import InvalidOperationError, NotFoundError
+from .services import InvalidOperationError, NotFoundError, new_chapter
 
 SUPPORTED_DETECTED = ("zh", "vi")
 
@@ -61,6 +61,20 @@ class UpdatePreview:
     append: chapter_merge.AppendPlan | None = None
     replace: chapter_merge.ReplacePlan | None = None
     progress: ProgressMove | None = None  # chỉ với chế độ tải lại, khi có tiến độ đọc
+
+
+@dataclass
+class UpdateResult:
+    novel: Novel
+    mode: UpdateMode
+    chapter_count: int  # số chương sau cập nhật
+    added: int = 0  # chế độ thêm
+    reused: int = 0
+    changed: int = 0
+    new: int = 0
+    kept: int = 0
+    deleted: int = 0
+    progress: ProgressMove | None = None
 
 
 def chapters_revision(chapters: Iterable[Chapter]) -> str:
@@ -144,6 +158,43 @@ class ChapterUpdateService:
         draft = self.drafts.get(draft_id)
         return self._compute(draft, mode, boundaries, keep_front_matter, start, delete)[0]
 
+    def apply(self, draft_id: str, mode: UpdateMode | str, boundaries: list[int],
+              keep_front_matter: bool | None = None, start: int | None = None,
+              delete: Iterable[int] = (), revision: str = "") -> UpdateResult:
+        """Tính lại từ đầu vào rồi ghi. `revision` phải khớp revision của bản xem trước, nếu
+        không → `StalePreviewError`. Xong thì xóa draft; lỗi thì giữ draft để thử lại."""
+        draft = self.drafts.get(draft_id)
+        if UpdateMode(mode) is UpdateMode.APPEND:
+            result = self._apply_append(draft, boundaries, keep_front_matter, start, revision)
+        else:
+            raise NotImplementedError
+        self.drafts.discard(draft_id)
+        return result
+
+    @staticmethod
+    def _check_revision(preview: UpdatePreview, revision: str) -> None:
+        if preview.revision != revision:
+            raise StalePreviewError("Truyện vừa thay đổi sau lúc xem trước, hãy xem lại thay đổi.")
+
+    def _append(self, novel: Novel, chapters: list[Chapter],
+                plan: chapter_merge.AppendPlan) -> UpdateResult:
+        if plan.needs_start:
+            raise StartRequiredError("Không tìm thấy điểm nối; hãy chọn chương bắt đầu thêm.")
+        if plan.nothing_new:
+            raise NothingNewError("File không có chương mới nào sau chương cuối của truyện.")
+        last = max((c.index for c in chapters), default=0)
+        added = [new_chapter(novel, last + i, inc.title, inc.body)
+                 for i, inc in enumerate(plan.to_add, start=1)]
+        self.repo.add_chapters(added)
+        return UpdateResult(novel, UpdateMode.APPEND, last + len(added), added=len(added))
+
+    def _apply_append(self, draft: Draft, boundaries: list[int], keep_front_matter: bool | None,
+                      start: int | None, revision: str) -> UpdateResult:
+        preview, chapters, _ = self._compute(draft, UpdateMode.APPEND, boundaries,
+                                             keep_front_matter, start, ())
+        self._check_revision(preview, revision)
+        return self._append(preview.novel, chapters, preview.append)
+
 
 __all__ = [
     "ChapterUpdateService",
@@ -154,5 +205,6 @@ __all__ = [
     "StartRequiredError",
     "UpdateMode",
     "UpdatePreview",
+    "UpdateResult",
     "chapters_revision",
 ]
