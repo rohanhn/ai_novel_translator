@@ -30,7 +30,7 @@ from .media.pillow_cover import PillowCoverProcessor
 from .providers import create_provider
 from .providers.chain import ChainLink, ChainProvider
 from .security import verify_password
-from .storage.db import DatabaseConfigError, create_pool
+from .storage.db import DatabaseConfigError, create_pool, ping
 from .storage.migrator import migrate
 from .storage.postgres_repo import PostgresRepository
 from .storage.quota_repo import PostgresQuotaTracker
@@ -55,6 +55,10 @@ class Container:
     pool: ConnectionPool
     cover_processor: CoverImageProcessor
     cover_fetcher: CoverImageFetcher
+
+    def database_ok(self) -> bool:
+        """Health check: database còn trả lời không (timeout ngắn, không ném lỗi)."""
+        return ping(self.pool)
 
     def close(self) -> None:
         self.jobs.shutdown()

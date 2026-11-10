@@ -94,7 +94,7 @@ Chuẩn hoá theo mô hình "CI build, VPS chỉ chạy" giải quyết các đi
   - `Dockerfile`: entrypoint, HEALTHCHECK, build arg version, OCI label;
   - `src/novel_translator/interfaces/api/app.py` (`/api/health`) và `auth.py` (CIDR, public path);
   - `interfaces/cli/main.py` (`migrate`);
-  - `storage/migrator.py`: chỉ thêm hàm `ping` cho health; hành vi với version lạ đã đúng, chỉ thêm test;
+  - `storage/db.py`: thêm hàm `ping` cho health. `storage/migrator.py` không đổi, vì hành vi với version lạ đã đúng, chỉ thêm test;
   - `config.py` (`NT_VERSION`);
   - `docker-compose.yml` ở gốc chỉ còn dùng để chạy thử local, cập nhật health;
   - `docs/DEPLOY.md` (viết lại), `docs/ARCHITECTURE.md`, `.env.example`.

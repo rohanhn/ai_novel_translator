@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     # Bản build của web app (SvelteKit SPA). Không tồn tại → chỉ chạy API.
     web_dir: Path = Path("web/build")
 
+    # Phiên bản đang chạy: image ghi vào lúc build (NT_VERSION = tag vX.Y.Z hoặc sha-xxxxxxx).
+    version: str = "dev"
+
     # Chỉ cho dev/kiểm tra giao diện: độ trễ (giây) giữa các dòng của provider `echo`.
     echo_delay: float = 0.0
 

@@ -17,7 +17,7 @@ CSRF_HEADER = "X-Requested-With"
 MUTATING = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 # Không cần session: endpoint login, health check, robots. Ngoài ra mọi đường dẫn của web app
 # (shell SPA + asset tĩnh, không chứa dữ liệu) đều công khai, xem is_public.
-PUBLIC_PATHS = frozenset({"/health", "/robots.txt", "/api/auth/login"})
+PUBLIC_PATHS = frozenset({"/health", "/api/health", "/robots.txt", "/api/auth/login"})
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 

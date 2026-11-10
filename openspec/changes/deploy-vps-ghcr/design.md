@@ -13,7 +13,7 @@ Hiện trạng liên quan:
 
 Lớp bị thay đổi:
 - **interfaces**: API thêm `/api/health` và parse CIDR trong `auth.py`; CLI thêm `migrate`.
-- **storage**: migrator thêm kiểm tra quy tắc "chỉ thêm" ở mức test, và hàm `ping`.
+- **storage**: `db.py` thêm hàm `ping` (gọi qua `Container.database_ok()`, nên interface không chạm thẳng vào storage); quy tắc "chỉ thêm" chỉ kiểm ở mức test.
 - **config**: thêm `version`, kiểm tra hợp lệ của `trusted_proxy`.
 - **domain, application, pipeline, providers**: không đổi.
 

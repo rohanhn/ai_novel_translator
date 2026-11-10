@@ -25,6 +25,16 @@ def _scrub(text: str, url: str) -> str:
     return text.replace(m.group(1), "***") if m and m.group(1) else text
 
 
+def ping(pool: ConnectionPool, timeout: float = 2.0) -> bool:
+    """True nếu lấy được connection trong `timeout` giây và `SELECT 1` chạy được."""
+    try:
+        with pool.connection(timeout=timeout) as conn:
+            conn.execute("SELECT 1")
+        return True
+    except (psycopg.Error, OSError):  # PoolTimeout là một psycopg.OperationalError
+        return False
+
+
 def create_pool(url: str | None, max_size: int = 5, var_name: str = "NT_DATABASE_URL"
                 ) -> ConnectionPool:
     """Mở pool và kiểm tra kết nối ngay; lỗi thì ném DatabaseConfigError có tên biến môi trường."""
