@@ -23,7 +23,7 @@
 ## 4. Web
 
 - [x] 4.1 Client API cho `/api/imports` và kiểu `ImportPreview` trong `web/src/lib/`; `UploadDialog` thành hai bước (chọn file → xem trước), 410 thì báo và quay lại bước 1; kiểm tra `npm run check` không lỗi
-- [ ] 4.2 Màn xem trước: tên truyện, công tắc ngôn ngữ có nhãn rõ nghĩa, số chương, lọc "chỉ chương có cảnh báo", khối phần đầu file (giữ/bỏ), danh sách chương ảo hóa với cảnh báo chữ thường cạnh chương, "Gộp vào chương trước", mở rộng chương để xem dòng và "Tách chương tại đây", "Lưu vào thư viện"/"Huỷ"; kiểm tra bằng Playwright `web/e2e/import.spec.ts` (mobile 360px và desktop): upload file tiếng Việt có số chương nhảy cóc → thấy cảnh báo ở đúng chương, gộp một chương, tách một chương, lưu → mục lục đúng số chương; huỷ → không có truyện mới; không cuộn ngang, vùng chạm ≥44px
+- [x] 4.2 Màn xem trước: tên truyện, công tắc ngôn ngữ có nhãn rõ nghĩa, số chương, lọc "chỉ chương có cảnh báo", khối phần đầu file (giữ/bỏ), danh sách chương ảo hóa với cảnh báo chữ thường cạnh chương, "Gộp vào chương trước", mở rộng chương để xem dòng và "Tách chương tại đây", "Lưu vào thư viện"/"Huỷ"; kiểm tra bằng Playwright `web/e2e/import.spec.ts` (mobile 360px và desktop): upload file tiếng Việt có số chương nhảy cóc → thấy cảnh báo ở đúng chương, gộp một chương, tách một chương, lưu → mục lục đúng số chương; huỷ → không có truyện mới; không cuộn ngang, vùng chạm ≥44px
 - [ ] 4.3 Reader và mục lục với truyện `pretranslated`: nhãn "Bản dịch có sẵn", ẩn "Xem bản gốc"/"Dịch lại", không gọi translate, không gửi reading-signal; kiểm tra bằng Playwright: mở chương của truyện tiếng Việt không có request `/translate` hay `/reading-signal`, biên tập vẫn lưu được
 
 ## 5. Kiểm tra tích hợp
