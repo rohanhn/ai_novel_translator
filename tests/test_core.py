@@ -4,10 +4,30 @@ from novel_translator.pipeline.prompts import build_system_prompt
 from novel_translator.pipeline.segmenter import segment
 
 
-def test_txt_loader_splits_chapters():
-    chapters = TxtLoader.parse("第一章 开始\n内容一\n第二章 继续\n内容二")
-    assert [c.title for c in chapters] == ["第一章 开始", "第二章 继续"]
-    assert chapters[1].text == "内容二"
+def test_txt_loader_reads_utf8_with_bom(tmp_path):
+    p = tmp_path / "a.txt"
+    p.write_bytes("\ufeff第一章 开始\n内容一".encode())
+    assert TxtLoader().read_text(p) == "第一章 开始\n内容一"
+
+
+def test_txt_loader_falls_back_to_gb18030(tmp_path):
+    p = tmp_path / "a.txt"
+    p.write_bytes("第一章 开始\n林动".encode("gb18030"))
+    assert TxtLoader().read_text(p) == "第一章 开始\n林动"
+
+
+def test_txt_loader_explicit_encoding(tmp_path):
+    p = tmp_path / "a.txt"
+    p.write_bytes("Chương 1".encode("utf-16"))
+    assert TxtLoader(encoding="utf-16").read_text(p) == "Chương 1"
+
+
+def test_txt_loader_undecodable(tmp_path):
+    import pytest
+    p = tmp_path / "a.txt"
+    p.write_bytes(b"\xff\xfe\x00\xd8\x81")
+    with pytest.raises(ValueError, match="encoding"):
+        TxtLoader().read_text(p)
 
 
 def test_segment_respects_max_chars_and_paragraphs():

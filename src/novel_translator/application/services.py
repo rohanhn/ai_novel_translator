@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from ..domain import chapter_split
 from ..domain.models import (
     ChainPolicy,
     Chapter,
@@ -64,12 +65,12 @@ class LibraryService:
         self.repo.delete_novel(novel_id)
 
     def import_novel(self, path: Path, title: str | None = None) -> tuple[Novel, int]:
-        raw = self.loader.load(path)
+        raw = chapter_split.plan(self.loader.read_text(path)).chapters
         if not raw:
             raise ValueError(f"Không tìm thấy nội dung trong {path}")
         novel = self.repo.add_novel(Novel(title=title or path.stem))
         chapters = [
-            Chapter(novel_id=novel.id, index=i + 1, title=r.title, source_text=r.text)
+            Chapter(novel_id=novel.id, index=i + 1, title=r.title, source_text=r.body)
             for i, r in enumerate(raw)
         ]
         self.repo.add_chapters(chapters)

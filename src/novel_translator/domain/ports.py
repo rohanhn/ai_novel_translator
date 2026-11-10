@@ -184,15 +184,10 @@ class SessionStore(Protocol):
     def delete_session(self, token_hash: str) -> None: ...
 
 
-class RawChapter(Protocol):
-    title: str
-    text: str
-
-
 class SourceLoader(Protocol):
-    """Đọc file nguồn và tách thành danh sách chương."""
+    """Đọc và giải mã file nguồn thành văn bản. Tách chương: `domain/chapter_split.py`."""
 
-    def load(self, path: Path) -> list[RawChapter]: ...
+    def read_text(self, path: Path) -> str: ...
 
 
 class Exporter(Protocol):
