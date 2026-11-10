@@ -247,3 +247,66 @@ def test_startup_resets_translating_to_pending(repo, db):
 
     assert repo.get_chapter(novel.id, 1).status == ChapterStatus.PENDING
     assert repo.get_chapter(novel.id, 2).status == ChapterStatus.TRANSLATED
+
+
+# ---------- edit-novel-details 1.2: thông tin truyện + ảnh bìa ----------
+
+def test_migration_002_on_existing_data(scratch_conn, tmp_path):
+    """Migrate tới 001, có dữ liệu, rồi áp 002: truyện cũ có các trường mới là NULL."""
+    import shutil
+
+    shutil.copy(MIGRATIONS_DIR / "001_initial.sql", tmp_path / "001_initial.sql")
+    migrate(scratch_conn, tmp_path)
+    scratch_conn.execute("INSERT INTO novels (title) VALUES ('cũ')")
+    shutil.copy(MIGRATIONS_DIR / "002_novel_details.sql", tmp_path / "002_novel_details.sql")
+    assert migrate(scratch_conn, tmp_path) == [2]
+    row = scratch_conn.execute(
+        "SELECT title, author, description, cover_updated_at FROM novels").fetchone()
+    assert row == {"title": "cũ", "author": None, "description": None, "cover_updated_at": None}
+    assert "novel_covers" in _tables(scratch_conn)
+
+
+def test_old_novel_has_empty_details(repo):
+    n = repo.add_novel(Novel(title="T"))
+    got = repo.get_novel(n.id)
+    assert (got.author, got.description, got.cover_updated_at, got.has_cover) == (
+        None, None, None, False)
+
+
+def test_update_novel_details_partial(repo):
+    n = repo.add_novel(Novel(title="T"))
+    got = repo.update_novel_details(n.id, {"author": "A", "description": "x\ny"})
+    assert (got.title, got.author, got.description) == ("T", "A", "x\ny")
+    got = repo.update_novel_details(n.id, {"title": "T2", "author": None})
+    assert (got.title, got.author, got.description) == ("T2", None, "x\ny")
+    assert repo.update_novel_details(n.id, {}).title == "T2"
+    assert repo.update_novel_details(999_999, {"title": "x"}) is None
+    # overview đọc được cột mới
+    assert repo.library_overview()[0].novel.description == "x\ny"
+
+
+def test_cover_set_replace_get_delete(repo):
+    from novel_translator.domain.novel_details import CoverImage
+
+    n = repo.add_novel(Novel(title="T"))
+    assert repo.get_cover(n.id) is None
+    a = repo.set_cover(n.id, CoverImage("image/webp", b"one", 10, 20))
+    assert a.has_cover and repo.get_cover(n.id) == CoverImage("image/webp", b"one", 10, 20)
+    b = repo.set_cover(n.id, CoverImage("image/webp", b"two", 30, 40))
+    assert b.cover_updated_at > a.cover_updated_at
+    assert repo.get_cover(n.id).data == b"two"
+    assert repo.get_novel(n.id).cover_updated_at == b.cover_updated_at
+    assert repo.delete_cover(n.id) is True
+    assert repo.get_cover(n.id) is None and not repo.get_novel(n.id).has_cover
+    assert repo.delete_cover(n.id) is False
+    assert repo.set_cover(999_999, CoverImage("image/webp", b"x", 1, 1)) is None
+
+
+def test_delete_novel_removes_cover(repo, db):
+    from novel_translator.domain.novel_details import CoverImage
+
+    n = repo.add_novel(Novel(title="T"))
+    repo.set_cover(n.id, CoverImage("image/webp", b"one", 10, 20))
+    repo.delete_novel(n.id)
+    with db.connection() as conn:
+        assert conn.execute("SELECT count(*) AS n FROM novel_covers").fetchone()["n"] == 0

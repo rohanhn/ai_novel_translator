@@ -3,7 +3,7 @@
 ## 1. Domain, schema và lưu trữ
 
 - [x] 1.1 Domain: `Novel` thêm `author`, `description`, `cover_updated_at`; `normalize_details` (NFC, trim, rỗng → `None`, `\r\n` → `\n`, giới hạn 200/100/2000, tên bắt buộc) ném `NovelDetailsError(field, message)` (lớp con `ValueError`); port `CoverImageProcessor`, `CoverImage`, `InvalidImageError`, port `CoverImageFetcher`, `CoverFetchError(reason)`; `NovelRepository` thêm `update_novel_details`/`set_cover`/`get_cover`/`delete_cover`. Kiểm tra: `tests/test_novel_details.py` phủ các trường hợp tên trống, quá dài, xoá tác giả, giữ xuống dòng; `grep` xác nhận `domain/` không import framework.
-- [ ] 1.2 Migration `storage/migrations/002_novel_details.sql` (3 cột NULL trong `novels`, bảng `novel_covers` có `ON DELETE CASCADE`); repo Postgres hiện thực 4 hàm mới (`set_cover` UPSERT và đặt `cover_updated_at` trong cùng `unit_of_work`), `_novel` map cột mới. Kiểm tra: test repo cho set/get/replace/delete cover, xoá truyện thì mất dòng `novel_covers`, truyện cũ có các trường `None`; migration chạy được trên DB test đang có dữ liệu.
+- [x] 1.2 Migration `storage/migrations/002_novel_details.sql` (3 cột NULL trong `novels`, bảng `novel_covers` có `ON DELETE CASCADE`); repo Postgres hiện thực 4 hàm mới (`set_cover` UPSERT và đặt `cover_updated_at` trong cùng `unit_of_work`), `_novel` map cột mới. Kiểm tra: test repo cho set/get/replace/delete cover, xoá truyện thì mất dòng `novel_covers`, truyện cũ có các trường `None`; migration chạy được trên DB test đang có dữ liệu.
 
 ## 2. Xử lý ảnh và application
 

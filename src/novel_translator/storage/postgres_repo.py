@@ -21,6 +21,7 @@ from ..domain.models import (
     ReadingProgress,
     SuggestionStatus,
 )
+from ..domain.novel_details import DETAIL_FIELDS, CoverImage
 
 
 class PostgresRepository:
@@ -65,9 +66,10 @@ class PostgresRepository:
     # --- novels ---
     def add_novel(self, novel: Novel) -> Novel:
         row = self._one(
-            "INSERT INTO novels (title, source_lang, target_lang, created_at)"
-            " VALUES (%s, %s, %s, %s) RETURNING id, glossary_version",
-            (novel.title, novel.source_lang, novel.target_lang, novel.created_at),
+            "INSERT INTO novels (title, source_lang, target_lang, created_at, author, description)"
+            " VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, glossary_version",
+            (novel.title, novel.source_lang, novel.target_lang, novel.created_at,
+             novel.author, novel.description),
         )
         novel.id, novel.glossary_version = row["id"], row["glossary_version"]
         return novel
@@ -283,6 +285,43 @@ class PostgresRepository:
     def delete_session(self, token_hash: str) -> None:
         self._rowcount("DELETE FROM sessions WHERE token_hash = %s", (token_hash,))
 
+    # --- thông tin truyện + ảnh bìa ---
+    def update_novel_details(self, novel_id: int, fields: dict[str, str | None]) -> Novel | None:
+        cols = [k for k in DETAIL_FIELDS if k in fields]  # tên cột lấy từ danh sách cố định
+        if not cols:
+            return self.get_novel(novel_id)
+        sets = ", ".join(f"{c} = %s" for c in cols)
+        row = self._one(f"UPDATE novels SET {sets} WHERE id = %s RETURNING *",
+                        (*[fields[c] for c in cols], novel_id))
+        return _novel(row) if row else None
+
+    def set_cover(self, novel_id: int, image: CoverImage) -> Novel | None:
+        with self.unit_of_work():
+            row = self._one(
+                "UPDATE novels SET cover_updated_at = clock_timestamp() WHERE id = %s"
+                " RETURNING *", (novel_id,))
+            if not row:
+                return None
+            self._rowcount(
+                "INSERT INTO novel_covers (novel_id, mime, data, width, height)"
+                " VALUES (%s, %s, %s, %s, %s) ON CONFLICT (novel_id) DO UPDATE SET"
+                " mime = EXCLUDED.mime, data = EXCLUDED.data,"
+                " width = EXCLUDED.width, height = EXCLUDED.height",
+                (novel_id, image.mime, image.data, image.width, image.height))
+            return _novel(row)
+
+    def get_cover(self, novel_id: int) -> CoverImage | None:
+        row = self._one("SELECT mime, data, width, height FROM novel_covers WHERE novel_id = %s",
+                        (novel_id,))
+        return CoverImage(row["mime"], bytes(row["data"]), row["width"], row["height"]) \
+            if row else None
+
+    def delete_cover(self, novel_id: int) -> bool:
+        with self.unit_of_work():
+            self._rowcount("UPDATE novels SET cover_updated_at = NULL WHERE id = %s", (novel_id,))
+            return self._rowcount("DELETE FROM novel_covers WHERE novel_id = %s",
+                                  (novel_id,)) > 0
+
     # --- preferences ---
     def get_preferences(self) -> dict[str, object]:
         return {r["key"]: r["value"] for r in self._all("SELECT key, value FROM preferences")}
@@ -298,7 +337,9 @@ class PostgresRepository:
 def _novel(r: dict[str, Any]) -> Novel:
     return Novel(id=r["id"], title=r["title"], source_lang=r["source_lang"],
                  target_lang=r["target_lang"], glossary_version=r["glossary_version"],
-                 created_at=r["created_at"], last_read_at=r["last_read_at"])
+                 created_at=r["created_at"], last_read_at=r["last_read_at"],
+                 author=r["author"], description=r["description"],
+                 cover_updated_at=r["cover_updated_at"])
 
 
 def _chapter(r: dict[str, Any]) -> Chapter:
