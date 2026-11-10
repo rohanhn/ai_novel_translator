@@ -38,13 +38,13 @@ jobs:
       E2E_DATABASE_URL: postgresql://nt:nt-ci-only@localhost:5432/nt_e2e_test
       PGPASSWORD: nt-ci-only
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Database riêng cho Playwright (e2e xoá schema, không dùng chung với pytest)
         run: psql -h localhost -U nt -d nt_test -c "CREATE DATABASE nt_e2e_test"
 
       # ---- Python: .venv ở gốc repo (Playwright gọi .venv/bin/python web/e2e/server.py)
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
           cache-dependency-glob: pyproject.toml
@@ -62,7 +62,7 @@ jobs:
         run: shellcheck deploy/*.sh docker/*.sh
 
       # ---- Web
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -81,7 +81,7 @@ jobs:
         run: npm run build
 
       - name: Cache Playwright browser
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}
@@ -95,9 +95,99 @@ jobs:
         run: npm run test:e2e
       - name: Báo cáo Playwright khi lỗi
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-results
           path: web/test-results
           retention-days: 7
           if-no-files-found: ignore
+
+  image:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write # chỉ job này được push lên GHCR
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # cần lịch sử main để kiểm tra tag
+
+      - name: Tag phát hành phải nằm trên main
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tag $GITHUB_REF_NAME trỏ tới commit không nằm trong lịch sử main; không phát hành."
+            exit 1
+          fi
+
+      - name: Tên image và version
+        id: vars
+        run: |
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            echo "version=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # main: sha-<7> + latest; tag vX.Y.Z: chỉ vX.Y.Z (không dời latest, không ghi đè sha-);
+      # PR: tag tạm pr-<số>, không bao giờ push. latest=false: tắt latest=auto cho tag semver.
+      - name: Tag image
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.vars.outputs.image }}
+          flavor: latest=false
+          tags: |
+            type=sha,prefix=sha-,format=short,enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern=v{{version}}
+            type=ref,event=pr,prefix=pr-
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Build ĐÚNG MỘT LẦN, nạp vào Docker local; bước quét và bước push dùng chính image này.
+      # Label version/revision do Dockerfile đặt từ build-arg (không lấy label của metadata-action).
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            NT_VERSION=${{ steps.vars.outputs.version }}
+            NT_REVISION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Quét lỗ hổng (Trivy)
+        uses: aquasecurity/trivy-action@v0.36.0
+        env:
+          # Mirror trước, GHCR dự phòng (GHCR hay trả TOOMANYREQUESTS trên runner dùng chung).
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2
+          TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db:1,ghcr.io/aquasecurity/trivy-java-db:1
+        with:
+          scan-type: image
+          # Tag đầu tiên của image vừa build (tên đầy đủ ghcr.io/...:tag).
+          image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+          cache: true # DB lỗ hổng cache theo ngày
+
+      - name: Đăng nhập GHCR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push đúng image đã quét
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        run: docker push --all-tags "${{ steps.vars.outputs.image }}"

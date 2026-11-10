@@ -39,7 +39,7 @@
   - `permissions: contents: read`; không dùng bí mật nào ngoài `GITHUB_TOKEN`.
 
   Kiểm: `actionlint` sạch; chạy thử các bước bằng lệnh local tương ứng.
-- [ ] 4.2 Thêm job `image` (`needs: checks`):
+- [x] 4.2 Thêm job `image` (`needs: checks`):
   - metadata-action: nhánh mặc định → `sha-<short>` + `latest`; tag semver → chỉ `v{{version}}`; `flavor: latest=false`; PR → tag tạm không push;
   - build đúng một lần: `linux/amd64`, `load: true`, `push: false`, `--build-arg NT_VERSION`;
   - Trivy quét image đã load: `HIGH,CRITICAL`, `ignore-unfixed`, `exit-code 1`; DB lấy từ mirror `public.ecr.aws` trước, GHCR làm dự phòng; cache DB theo ngày;
