@@ -31,7 +31,7 @@ app.middleware("http")(auth_middleware)
 # Đăng ký sau → bọc ngoài cùng: cả response 401/403 của auth cũng có header noindex.
 app.middleware("http")(noindex_middleware)
 errors.install(app)
-for r in (auth_router, library.router, imports.router, chapters.router, glossary.router, reading.router,
+for r in (auth_router, library.router, library.covers_router, imports.router, chapters.router, glossary.router, reading.router,
           prefetch.router, settings.router):
     app.include_router(r)
 

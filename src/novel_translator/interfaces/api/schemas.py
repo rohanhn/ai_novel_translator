@@ -19,9 +19,20 @@ from ...domain.models import (
 )
 
 
+def cover_url(n: Novel) -> str | None:
+    """Địa chỉ ảnh bìa có phiên bản (`?v=` theo thời điểm đổi ảnh) để không bao giờ dùng
+    ảnh cũ trong cache; `None` khi chưa có ảnh (web vẽ bìa tự sinh)."""
+    if n.cover_updated_at is None:
+        return None
+    return f"/api/novels/{n.id}/cover?v={int(n.cover_updated_at.timestamp() * 1000)}"
+
+
 class NovelOut(BaseModel):
     id: int
     title: str
+    author: str | None
+    description: str | None  # giới thiệu ngắn, giữ xuống dòng
+    cover_url: str | None
     source_lang: str
     target_lang: str
     pretranslated: bool  # bản dịch có sẵn (import từ file tiếng Việt): không dịch bằng model
@@ -31,7 +42,8 @@ class NovelOut(BaseModel):
 
     @classmethod
     def of(cls, n: Novel) -> NovelOut:
-        return cls(id=n.id, title=n.title, source_lang=n.source_lang, target_lang=n.target_lang,
+        return cls(id=n.id, title=n.title, author=n.author, description=n.description,
+                   cover_url=cover_url(n), source_lang=n.source_lang, target_lang=n.target_lang,
                    pretranslated=n.pretranslated, glossary_version=n.glossary_version,
                    created_at=n.created_at, last_read_at=n.last_read_at)
 
@@ -218,3 +230,16 @@ class ImportCommitIn(ImportAdjustIn):
 class ImportLinesOut(BaseModel):
     start: int
     lines: list[str]
+
+
+class NovelDetailsIn(BaseModel):
+    """PATCH thông tin truyện: chỉ trường có mặt trong body được đổi (`model_fields_set`).
+    Không đặt giới hạn độ dài ở đây: `normalize_details` kiểm và báo lỗi kèm `field` (400)."""
+
+    title: str | None = None
+    author: str | None = None
+    description: str | None = None
+
+
+class CoverFetchIn(BaseModel):
+    url: str

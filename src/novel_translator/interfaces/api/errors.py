@@ -15,6 +15,7 @@ from ...application.services import (
     NotFoundError,
     PreTranslatedError,
 )
+from ...domain.novel_details import CoverFetchError, InvalidImageError, NovelDetailsError
 from ...domain.ports import DailyQuotaError, RateQuotaError, TranslationError
 
 
@@ -41,6 +42,18 @@ async def _draft_expired(_: Request, e: DraftExpiredError):
 
 async def _invalid(_: Request, e: InvalidOperationError):
     return _json(409, str(e), code="invalid_operation")
+
+
+async def _novel_details(_: Request, e: NovelDetailsError):
+    return _json(400, str(e), field=e.field)
+
+
+async def _invalid_image(_: Request, e: InvalidImageError):
+    return _json(400, str(e), field="cover")
+
+
+async def _cover_fetch(_: Request, e: CoverFetchError):
+    return _json(400, str(e), field="cover_url", reason=e.reason)
 
 
 async def _bad_request(_: Request, e: ValueError):
@@ -73,6 +86,9 @@ def install(app: FastAPI) -> None:
     app.add_exception_handler(PreTranslatedError, _pretranslated)
     app.add_exception_handler(InvalidOperationError, _invalid)
     app.add_exception_handler(DraftExpiredError, _draft_expired)
+    app.add_exception_handler(NovelDetailsError, _novel_details)
+    app.add_exception_handler(InvalidImageError, _invalid_image)
+    app.add_exception_handler(CoverFetchError, _cover_fetch)
     app.add_exception_handler(ValueError, _bad_request)
     app.add_exception_handler(DailyQuotaError, _daily_quota)
     app.add_exception_handler(RateQuotaError, _rate_quota)
