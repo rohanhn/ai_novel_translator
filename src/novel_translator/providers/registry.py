@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ..config import Settings
-from ..domain.ports import LLMProvider
+from ..domain.ports import LLMProvider, ProviderConfigError
 
 ProviderFactory = Callable[[Settings], LLMProvider]
 
@@ -50,12 +50,24 @@ def _ollama(settings: Settings) -> LLMProvider:
     )
 
 
+def _gemini(settings: Settings) -> LLMProvider:
+    key = settings.gemini_api_key.get_secret_value() if settings.gemini_api_key else ""
+    if not key.strip():
+        raise ProviderConfigError(
+            "Thiếu GEMINI_API_KEY: đặt API key Gemini của bạn trong biến môi trường hoặc .env."
+        )
+    from .gemini import GeminiProvider
+
+    return GeminiProvider(api_key=key, timeout_s=settings.gemini_timeout)
+
+
 def _echo(settings: Settings) -> LLMProvider:
     from .echo import EchoProvider
 
-    return EchoProvider()
+    return EchoProvider(delay=settings.echo_delay)
 
 
+register_provider("gemini", _gemini)
 register_provider("anthropic", _anthropic)
 register_provider("openai", _openai)
 register_provider("ollama", _ollama)

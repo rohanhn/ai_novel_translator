@@ -10,13 +10,18 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.30",
     "python-multipart>=0.0.9",
+    "google-genai>=1.0",
+    "argon2-cffi>=23.1",
+    "psycopg[binary,pool]>=3.2",
+    "Pillow>=11",
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.70"]
 openai = ["openai>=1.40"]
 all = ["novel-translator[anthropic,openai]"]
-dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6"]
+dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]
 novel = "novel_translator.interfaces.cli.main:app"

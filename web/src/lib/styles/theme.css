@@ -1,0 +1,337 @@
+/*
+ * "Thủy mặc · Chu sa" (design D11). Component chỉ dùng biến, không viết mã màu trực tiếp.
+ * Theme đọc (lưu server-side): light = Tuyên chỉ, sepia = Hoàng quyển, dark = Dạ nguyệt,
+ * bamboo = Trúc lâm. Tương phản được kiểm tra bằng `npm run check:contrast`.
+ */
+
+:root,
+[data-theme='light'] {
+	--paper: #f3ede0;
+	--paper-raised: #faf6ec;
+	--paper-sunk: #e6dcc6;
+	--field: #fffdf7;
+	--ink: #1e1b16;
+	--ink-soft: #3d372d;
+	--ink-muted: #5e5648;
+	--label: #7a5b20; /* chữ nhỏ dạng nhãn (đậm hơn --bronze để đủ tương phản) */
+	--cinnabar: #9e2b1e;
+	--cinnabar-strong: #7a1f14;
+	--cinnabar-inner: #b9483a;
+	--on-cinnabar: #f8f1e4;
+	--jade: #2f6b57;
+	--jade-strong: #23463b;
+	--bronze: #8c6a2a; /* chỉ trang trí, không dùng cho chữ nhỏ */
+	--line: #d9cdb4;
+	--line-strong: #c9b78f;
+	--inverse: #1e1b16;
+	--on-inverse: #f3ede0;
+	--ok-fg: #2f6b57;
+	--ok-bg: #edf3ef;
+	--ok-line: #a9c6b8;
+	--edited-fg: #23463b;
+	--edited-bg: #dcebe3;
+	--warn-fg: #5c4a10;
+	--warn-bg: #fbf1d8;
+	--warn-line: #e0c88f;
+	--danger-fg: #8a2418;
+	--danger-bg: #fbedea;
+	--danger-line: #e2b5ac;
+	--info-fg: #26344a;
+	--info-bg: #e7ecf3;
+	--shadow: rgba(30, 27, 22, 0.3);
+	--scrim: rgba(30, 27, 22, 0.55);
+	color-scheme: light;
+}
+
+[data-theme='sepia'] {
+	--paper: #ecdfc2;
+	--paper-raised: #f4ead3;
+	--paper-sunk: #dccba5;
+	--field: #faf3e2;
+	--ink: #2a2015;
+	--ink-soft: #3f3322;
+	--ink-muted: #5a4a33;
+	--label: #6b4f1a;
+	--cinnabar: #93281b;
+	--cinnabar-strong: #6f1c12;
+	--cinnabar-inner: #ad4536;
+	--on-cinnabar: #f8f1e4;
+	--jade: #2b604e;
+	--jade-strong: #1f4237;
+	--bronze: #7e5e22;
+	--line: #cfba8f;
+	--line-strong: #b9a06d;
+	--inverse: #2a2015;
+	--on-inverse: #f4ead3;
+	--ok-fg: #24584a;
+	--ok-bg: #e4ead9;
+	--ok-line: #9fbca9;
+	--edited-fg: #1f4237;
+	--edited-bg: #d6e3d4;
+	--warn-fg: #57440c;
+	--warn-bg: #f6e6be;
+	--warn-line: #d8bd7c;
+	--danger-fg: #7f2015;
+	--danger-bg: #f6e1d6;
+	--danger-line: #ddae9c;
+	--info-fg: #26344a;
+	--info-bg: #e3e3dc;
+	--shadow: rgba(42, 32, 21, 0.3);
+	--scrim: rgba(42, 32, 21, 0.55);
+	color-scheme: light;
+}
+
+[data-theme='dark'] {
+	--paper: #15171c;
+	--paper-raised: #1e2128;
+	--paper-sunk: #2a2e37;
+	--field: #12141a;
+	--ink: #e8e1d1;
+	--ink-soft: #d2cab8;
+	--ink-muted: #a9a090;
+	--label: #c9a865;
+	--cinnabar: #dd7a68;
+	--cinnabar-strong: #e8907f;
+	--cinnabar-inner: #e58e7d;
+	--on-cinnabar: #1a0c09;
+	--jade: #6fb59a;
+	--jade-strong: #8fcab3;
+	--bronze: #a8874a;
+	--line: #353a45;
+	--line-strong: #4a5060;
+	--inverse: #e8e1d1;
+	--on-inverse: #15171c;
+	--ok-fg: #8fcab3;
+	--ok-bg: #1b2c27;
+	--ok-line: #36584b;
+	--edited-fg: #a7d8c4;
+	--edited-bg: #1f3530;
+	--warn-fg: #e6c77d;
+	--warn-bg: #2e2716;
+	--warn-line: #5f4f26;
+	--danger-fg: #f0a092;
+	--danger-bg: #351c18;
+	--danger-line: #6b3329;
+	--info-fg: #a9bfe0;
+	--info-bg: #1c2433;
+	--shadow: rgba(0, 0, 0, 0.5);
+	--scrim: rgba(0, 0, 0, 0.6);
+	color-scheme: dark;
+}
+
+[data-theme='bamboo'] {
+	--paper: #e3eadb;
+	--paper-raised: #eef3e8;
+	--paper-sunk: #d1dcc6;
+	--field: #f7faf3;
+	--ink: #1b2318;
+	--ink-soft: #2f3a2b;
+	--ink-muted: #4a5844;
+	--label: #55602a;
+	--cinnabar: #972d21;
+	--cinnabar-strong: #722117;
+	--cinnabar-inner: #b04a3d;
+	--on-cinnabar: #f8f1e4;
+	--jade: #2a6450;
+	--jade-strong: #1e463a;
+	--bronze: #6d6a2e;
+	--line: #c2cfb6;
+	--line-strong: #a7b897;
+	--inverse: #1b2318;
+	--on-inverse: #eef3e8;
+	--ok-fg: #23584a;
+	--ok-bg: #dcebe0;
+	--ok-line: #9fc0ab;
+	--edited-fg: #1e463a;
+	--edited-bg: #cfe2d6;
+	--warn-fg: #574710;
+	--warn-bg: #f1ebc9;
+	--warn-line: #d3c27f;
+	--danger-fg: #842519;
+	--danger-bg: #f5e3dc;
+	--danger-line: #ddb0a4;
+	--info-fg: #25364a;
+	--info-bg: #dfe6e6;
+	--shadow: rgba(27, 35, 24, 0.3);
+	--scrim: rgba(27, 35, 24, 0.55);
+	color-scheme: light;
+}
+
+:root {
+	--font-han: 'Ma Shan Zheng', 'Noto Serif SC', serif;
+	--font-title: 'Cormorant Garamond', 'Noto Serif', 'Noto Serif SC', Georgia, serif;
+	--font-body: 'Noto Serif', 'Noto Serif SC', Georgia, serif;
+	--font-cjk: 'Noto Serif SC', 'Noto Serif', serif;
+	--font-ui: 'Be Vietnam Pro', system-ui, 'Noto Serif SC', -apple-system, 'Segoe UI', sans-serif;
+	/* Bìa truyện: giống nhau ở mọi theme, chữ trên bìa dùng --on-cover */
+	--cover-1: #1e1b16;
+	--cover-2: #23463b;
+	--cover-3: #5a1c14;
+	--cover-4: #26344a;
+	--cover-5: #4a3a22;
+	--on-cover: #f3ede0;
+	--touch: 44px;
+	--gutter: 16px;
+	--reader-size: 18px;
+	--reader-leading: 1.8;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--paper);
+	color: var(--ink);
+	font-family: var(--font-ui);
+	font-size: 15px;
+	line-height: 1.5;
+	overflow-x: hidden;
+	/* Cormorant mặc định dùng số kiểu cổ (0 giống chữ o): dùng số thẳng hàng cho dễ đọc */
+	font-variant-numeric: lining-nums;
+}
+
+a {
+	color: var(--cinnabar);
+}
+a:hover {
+	color: var(--cinnabar-strong);
+}
+
+:focus-visible {
+	outline: 2px solid var(--cinnabar);
+	outline-offset: 2px;
+}
+
+h1,
+h2,
+h3 {
+	font-family: var(--font-title);
+	font-weight: 700;
+	line-height: 1.1;
+	margin: 0;
+}
+
+.han {
+	font-family: var(--font-han);
+	font-weight: 400;
+}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Nút dùng chung */
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: var(--touch);
+	padding: 0 18px;
+	border: 1px solid var(--ink);
+	background: transparent;
+	color: var(--ink);
+	font: inherit;
+	font-size: 14px;
+	font-weight: 600;
+	text-decoration: none;
+	cursor: pointer;
+}
+.btn:hover {
+	color: var(--ink);
+	background: var(--paper-sunk);
+}
+.btn:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+.btn-primary {
+	border: none;
+	background: var(--cinnabar);
+	color: var(--on-cinnabar);
+	box-shadow:
+		inset 0 0 0 1px var(--cinnabar),
+		inset 0 0 0 3px var(--cinnabar-inner);
+}
+.btn-primary:hover {
+	background: var(--cinnabar-strong);
+	color: var(--on-cinnabar);
+}
+.btn-ink {
+	border: none;
+	background: var(--inverse);
+	color: var(--on-inverse);
+}
+.btn-ink:hover {
+	background: var(--ink-soft);
+	color: var(--on-inverse);
+}
+.btn-danger {
+	border-color: var(--cinnabar);
+	color: var(--cinnabar);
+}
+.btn-ghost {
+	border-color: transparent;
+}
+
+.field {
+	min-height: var(--touch);
+	padding: 0 12px;
+	border: 1px solid var(--line-strong);
+	background: var(--field);
+	color: var(--ink);
+	font: inherit;
+	font-size: 16px; /* ≥16px: iOS không tự phóng to khi focus */
+}
+textarea.field {
+	padding: 10px 12px;
+}
+
+/* Hộp thông báo: chữ thường, rõ nghĩa */
+.notice {
+	margin: 0;
+	padding: 10px 12px;
+	border: 1px solid var(--line-strong);
+	background: var(--paper-raised);
+	font-size: 14px;
+	line-height: 1.55;
+}
+.notice-danger {
+	border-color: var(--danger-line);
+	background: var(--danger-bg);
+	color: var(--danger-fg);
+}
+.notice-warn {
+	border-color: var(--warn-line);
+	background: var(--warn-bg);
+	color: var(--warn-fg);
+}
+.notice-ok {
+	border-color: var(--ok-line);
+	background: var(--ok-bg);
+	color: var(--edited-fg);
+}
+
+.eyebrow {
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	color: var(--label);
+}

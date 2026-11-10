@@ -21,12 +21,16 @@ The system SHALL expose a JSON HTTP API under `/api` covering: authentication, l
 - **THEN** the API returns 201 with the created novel
 
 #### Scenario: Translation provider error
-- **WHEN** translation fails with a provider error other than quota
-- **THEN** the API returns HTTP 502 with the error category and message
+- **WHEN** a translation is requested and the provider chain cannot be used (missing API key, unknown provider or model)
+- **THEN** the API returns HTTP 502 with the error category and message, and no job is created
+
+#### Scenario: Provider error during translation
+- **WHEN** an accepted translation (HTTP 202) later fails with a provider error other than quota
+- **THEN** the translation event stream emits a `failed` terminal event carrying the error category and message
 
 #### Scenario: Quota exhausted
 - **WHEN** translation is requested while the whole chain is out of daily quota
-- **THEN** the API returns HTTP 429 with the reset time
+- **THEN** the API returns HTTP 429 with the reset time, and no job is created
 
 ## ADDED Requirements
 

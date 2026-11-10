@@ -61,7 +61,7 @@ The reader SHALL label a chapter that was translated by a fallback (non-primary)
 - **THEN** the reader shows a label indicating the fallback model was used, with a re-translate action
 
 ### Requirement: Reading preferences
-The reader SHALL let the owner choose background theme (at least light, sepia, dark), font size, and line height; preferences SHALL be stored server-side and apply on every device.
+The reader SHALL let the owner choose background theme (at least light, sepia, dark, displayed as Tuyên chỉ, Hoàng quyển and Dạ nguyệt), font size, and line height; preferences SHALL be stored server-side and apply on every device.
 
 #### Scenario: Preferences persist across devices
 - **WHEN** the owner sets dark theme on the phone and later opens the reader on a laptop
@@ -80,3 +80,14 @@ The reader SHALL be usable without horizontal scrolling on viewports 360px wide 
 #### Scenario: Small phone
 - **WHEN** the reader is displayed on a 360px-wide viewport
 - **THEN** text wraps within the viewport and no horizontal scrollbar appears
+
+### Requirement: Plain-language labels
+Every themed (xianxia-style) navigation or section label in the web UI SHALL be shown together with a plain-language label, and chapter statuses, error messages, quota notices and confirmation dialogs SHALL use plain wording only.
+
+#### Scenario: Themed navigation label
+- **WHEN** the owner sees the navigation item "Tàng Thư Các"
+- **THEN** the plain label "Thư viện" is displayed with it
+
+#### Scenario: Failed chapter status
+- **WHEN** a chapter's translation has failed
+- **THEN** its status is shown as plain wording such as "Lỗi" together with the reason, not as a themed term

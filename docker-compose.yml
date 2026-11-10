@@ -1,0 +1,38 @@
+# Compose mẫu: app nối vào Docker network sẵn có của shared-postgres (xem docs/DEPLOY.md).
+# Biến được đọc từ .env cạnh file này (docker compose tự nạp để thay ${...}).
+#
+#   NT_DB_NETWORK   tên Docker network của shared-postgres (bắt buộc; tìm bằng
+#                   `docker inspect shared-postgres --format '{{json .NetworkSettings.Networks}}'`)
+#   NT_DB_HOST      hostname của Postgres trong network đó (mặc định shared-postgres)
+#   NT_DB_PASSWORD  mật khẩu role của app (bắt buộc; URL-encode nếu có ký tự đặc biệt)
+#   NT_DB_USER, NT_DB_NAME, NT_DB_PORT   mặc định ai_novel_translator / ai_novel_translator / 5432
+#   NT_PASSWORD_HASH hash argon2 của mật khẩu đăng nhập (bắt buộc)
+#   NT_BIND         địa chỉ:cổng publish trên host cho reverse proxy (mặc định 127.0.0.1:8000)
+#   NT_IMAGE_TAG    tag image chạy (mặc định latest; đặt tag cũ để rollback)
+
+name: novel-translator
+
+services:
+  app:
+    build: .
+    image: novel-translator:${NT_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Ghi đè NT_DATABASE_URL của .env (bản đó dùng localhost cho dev ngoài Docker).
+      NT_DATABASE_URL: "postgresql://${NT_DB_USER:-ai_novel_translator}:${NT_DB_PASSWORD:?đặt NT_DB_PASSWORD}@${NT_DB_HOST:-shared-postgres}:${NT_DB_PORT:-5432}/${NT_DB_NAME:-ai_novel_translator}"
+      # Bắt buộc: hash argon2 tạo bằng `novel hash-password` (đặt trong .env, giữ nháy đơn).
+      NT_PASSWORD_HASH: ${NT_PASSWORD_HASH:?đặt NT_PASSWORD_HASH}
+      NT_COOKIE_SECURE: ${NT_COOKIE_SECURE:-true}  # false chỉ khi thử qua http://localhost
+      NT_WEB_DIR: /app/web/build
+    ports:
+      - "${NT_BIND:-127.0.0.1:8000}:8000"
+    networks:
+      - shared-db
+
+networks:
+  shared-db:
+    external: true
+    name: ${NT_DB_NETWORK:?đặt NT_DB_NETWORK là tên network của shared-postgres}
