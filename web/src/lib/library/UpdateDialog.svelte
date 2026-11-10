@@ -5,6 +5,7 @@
 	import { formatBytes } from '../realm.js';
 	import type { ImportPreview as Preview, Novel, UpdateResult } from '../types.js';
 	import ImportPreview from './ImportPreview.svelte';
+	import UpdateChanges from './UpdateChanges.svelte';
 	import { MAX_UPLOAD_BYTES, createImport, discardImport, uploadErrorMessage } from './imports.js';
 
 	let {
@@ -81,7 +82,15 @@
 	subtitle={`${novel.title} · ${subtitles[step]}`}
 	size={step === 'file' ? 'default' : 'wide'}
 >
-	{#if step === 'split' && preview}
+	{#if step === 'changes' && preview}
+		<UpdateChanges
+			{preview}
+			onapplied={finished}
+			onexpired={expired}
+			onback={() => (step = 'split')}
+			oncancel={() => (open = false)}
+		/>
+	{:else if step === 'split' && preview}
 		<ImportPreview
 			bind:preview
 			onnext={() => (step = 'changes')}
