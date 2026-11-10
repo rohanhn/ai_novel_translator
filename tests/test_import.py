@@ -88,3 +88,47 @@ def test_gb18030_chinese_file(container, tmp_path):
     res = container.library.import_novel(p)
     assert res.lang == "zh"
     assert container.library.get_chapter(res.novel.id, 1).title == "第一章 少年"
+
+
+# --- Requirement: Pre-translated novels never reach an LLM -----------------------------------
+
+@pytest.fixture
+def vi_novel(container):
+    return container.library.import_text(VI, "kiemlai").novel
+
+
+def _echo_calls(container):
+    return container.provider_factory(None).calls
+
+
+@pytest.mark.parametrize("force", [False, True])
+def test_translate_rejected_without_llm_call(container, vi_novel, force):
+    from novel_translator.application.services import PreTranslatedError
+    with pytest.raises(PreTranslatedError):
+        container.translation.translate_chapter(vi_novel.id, 1, force=force)
+    with pytest.raises(PreTranslatedError):
+        container.translation.preflight(vi_novel.id, 2, force=force)
+    with pytest.raises(PreTranslatedError):
+        container.jobs.submit(vi_novel.id, 1)
+    assert _echo_calls(container) == []
+    assert container.jobs.get(vi_novel.id, 1) is None
+    assert container.library.get_chapter(vi_novel.id, 1).status == ChapterStatus.TRANSLATED
+
+
+def test_never_selected_for_prefetch(container, vi_novel):
+    from novel_translator.application.prefetch import ReadingSignal
+    d = container.prefetch.on_reading_signal(vi_novel.id, 1, ReadingSignal.VISIBLE_30S)
+    assert (d.started, d.reason) == (False, "pretranslated")
+    assert container.jobs.get(vi_novel.id, 2) is None
+    assert _echo_calls(container) == []
+
+
+def test_manual_edit_of_pretranslated_chapter(container, vi_novel):
+    ch = container.editing.edit_chapter(vi_novel.id, 2, "Chương 2: Mở cửa", "Bản sửa tay.")
+    assert ch.status == ChapterStatus.EDITED and ch.translated_text == "Bản sửa tay."
+
+
+def test_export_pretranslated_novel(container, vi_novel, tmp_path):
+    out = container.exports.export(vi_novel.id, tmp_path / "out.txt").read_text(encoding="utf-8")
+    assert out.index("Chương 1: Rồng ngẩng đầu") < out.index("Chương 2: Mở cửa")
+    assert "Trời vừa tảng sáng" in out

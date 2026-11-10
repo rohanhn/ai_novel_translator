@@ -24,7 +24,7 @@ class ReadingSignal(str, Enum):
 class PrefetchDecision:
     started: bool
     reason: str  # started | no_next_chapter | already_translated | edited | in_progress
-    #              | disabled | primary_exhausted
+    #              | disabled | primary_exhausted | pretranslated
     chapter_index: int | None = None
 
 
@@ -39,12 +39,16 @@ class PrefetchService:
 
     def on_reading_signal(self, novel_id: int, index: int,
                           signal: ReadingSignal) -> PrefetchDecision:
-        if not self.repo.get_novel(novel_id) or not self.repo.get_chapter(novel_id, index):
+        novel = self.repo.get_novel(novel_id)
+        if not novel or not self.repo.get_chapter(novel_id, index):
             raise NotFoundError(f"Không có chương {index} của truyện {novel_id}")
         target = index + 1
 
         def no(reason: str) -> PrefetchDecision:
             return PrefetchDecision(False, reason, target)
+
+        if novel.pretranslated:
+            return no("pretranslated")  # bản dịch có sẵn: không bao giờ gửi tới LLM
 
         if not self.enabled():
             return no("disabled")

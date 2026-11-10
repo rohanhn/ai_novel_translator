@@ -41,6 +41,10 @@ class InvalidOperationError(ValueError):
     """Thao tác không hợp lệ với trạng thái hiện tại (vd. sửa chương chưa dịch)."""
 
 
+class PreTranslatedError(InvalidOperationError):
+    """Chương của truyện bản dịch có sẵn: không bao giờ gửi tới LLM (spec novel-library)."""
+
+
 class ConfirmationRequiredError(InvalidOperationError):
     """Thao tác làm mất dữ liệu (dịch lại chương đã biên tập) cần chủ sở hữu xác nhận."""
 
@@ -308,11 +312,16 @@ class TranslationService:
 
     def check_translatable(self, novel_id: int, index: int, force: bool = False,
                            confirm_discard_edits: bool = False) -> Chapter:
-        """Kiểm tra trước khi tạo job: chương tồn tại; dịch lại chương đã biên tập phải có
-        xác nhận (bản sửa tay sẽ mất)."""
+        """Kiểm tra trước khi tạo job: chương tồn tại; truyện bản dịch có sẵn không bao giờ
+        được dịch; dịch lại chương đã biên tập phải có xác nhận (bản sửa tay sẽ mất)."""
         chapter = self.repo.get_chapter(novel_id, index)
-        if not self.repo.get_novel(novel_id) or not chapter:
+        novel = self.repo.get_novel(novel_id)
+        if not novel or not chapter:
             raise NotFoundError(f"Không có chương {index} của truyện {novel_id}")
+        if novel.pretranslated:
+            raise PreTranslatedError(
+                "Truyện này là bản dịch có sẵn (import từ file tiếng Việt), không dịch bằng model."
+            )
         if chapter.status == ChapterStatus.EDITED and force and not confirm_discard_edits:
             raise ConfirmationRequiredError(
                 f"Chương {index} đã được biên tập tay; dịch lại sẽ mất bản sửa. "
