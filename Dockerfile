@@ -27,11 +27,20 @@ ENV NT_VERSION=${NT_VERSION} \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /app
 
+# Vá gói hệ thống của base image ngay khi build (Trivy chặn release nếu còn CVE HIGH/CRITICAL
+# đã có bản vá, xem design D1); dọn danh sách apt để không phình image.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 # Provider tùy chọn: --build-arg EXTRAS=all để có thêm anthropic/openai.
 ARG EXTRAS=""
 COPY pyproject.toml ./
 COPY src/ ./src/
+# Cài xong thì gỡ pip: lúc chạy không cần, và pip mang theo bản riêng của msgpack/setuptools/
+# urllib3 mà Trivy báo lỗ hổng.
 RUN pip install ".${EXTRAS:+[$EXTRAS]}" \
+    && pip uninstall -y pip \
     && useradd --system --uid 10001 --no-create-home app
 
 COPY --from=web /web/build ./web/build
