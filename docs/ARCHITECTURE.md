@@ -20,6 +20,7 @@ Web reader cá nhân dịch truyện Trung → Việt bằng LLM, chạy một c
    │  jobs.py: TranslationJobManager (2 làn: foreground, │
    │           background; 1 job/chương; replay sự kiện) │
    │  prefetch.py: buffer N+1 · auth.py: đăng nhập/session│
+   │  imports.py: bản xem trước import TXT (bộ nhớ, TTL) │
    └──────────┬─────────────────────────┬────────────────┘
               │                         ▼
               │           ┌──────────────────────────────┐
@@ -28,7 +29,7 @@ Web reader cá nhân dịch truyện Trung → Việt bằng LLM, chạy một c
               │           └──────────────┬───────────────┘
               ▼                          ▼
    ┌─────────────────────────────────────────────────────┐
-   │ domain/ (models + ports + lỗi dịch)                 │  không phụ thuộc gì
+   │ domain/ (models, ports, lỗi dịch, chapter_split)    │  không phụ thuộc gì
    └─────────────────────────────────────────────────────┘
         ▲                  ▲                       ▲            ▲
    storage/            providers/              ingest/txt   export/txt     adapters
@@ -52,12 +53,12 @@ reading-signal (≥30s, ≥60% cuộn) ─► PrefetchService ─► job backgro
 
 | Thư mục | Vai trò | Được import |
 |---|---|---|
-| `domain/` | `Novel`, `Chapter` (status `pending`/`translating`/`translated`/`edited`/`failed`), `GlossaryEntry`, `GlossarySuggestion`, `ReadingProgress`, `ChainPolicy`; port `LLMProvider` (`stream`/`complete`), `NovelRepository`, `QuotaTracker`, `SessionStore`, `SourceLoader`, `Exporter`; lỗi `RefusalError`, `TruncatedError`, `RateQuotaError`, `DailyQuotaError`, `MalformedOutputError`, `ProviderError`; `rename.py` (thay tên theo ranh giới từ) | không gì cả |
+| `domain/` | `Novel` (`pretranslated` khi import từ bản tiếng Việt), `Chapter` (status `pending`/`translating`/`translated`/`edited`/`failed`), `GlossaryEntry`, `GlossarySuggestion`, `ReadingProgress`, `ChainPolicy`; port `LLMProvider` (`stream`/`complete`), `NovelRepository`, `QuotaTracker`, `SessionStore`, `SourceLoader`, `Exporter`; `chapter_split.py` (nhận diện tiêu đề chương Trung/Việt, quyển, phần mở đầu, ngôn ngữ file, cảnh báo, áp ranh giới tùy ý); lỗi `RefusalError`, `TruncatedError`, `RateQuotaError`, `DailyQuotaError`, `MalformedOutputError`, `ProviderError`; `rename.py` (thay tên theo ranh giới từ) | không gì cả |
 | `pipeline/` | `prompts` (prompt 3 phần + glossary), `sections` (`SectionParser` streaming), `translator` (`ChapterTranslator`: một request mỗi chương, kiểm tra sót đoạn), `segmenter` (chỉ cắt khi vượt `NT_CHAPTER_CHAR_LIMIT`) | domain |
-| `application/` | `services.py` (`LibraryService`, `GlossaryService` gồm hàng chờ đề xuất và lan truyền đổi tên, `TranslationService`, `ReaderService` tiến độ + tùy chọn, `EditingService`, `ExportService`); `jobs.py`; `prefetch.py`; `auth.py` | domain, pipeline |
+| `application/` | `services.py` (`LibraryService`, `GlossaryService` gồm hàng chờ đề xuất và lan truyền đổi tên, `TranslationService`, `ReaderService` tiến độ + tùy chọn, `EditingService`, `ExportService`); `imports.py` (`ImportDraftService`: upload → xem trước → xác nhận); `jobs.py`; `prefetch.py`; `auth.py` | domain, pipeline |
 | `providers/` | `chain` (`ChainProvider`: fallback theo `NT_CHAIN`, policy FOREGROUND/BACKGROUND, backoff lỗi phút, chuyển bước khi hết quota ngày), `gemini` (mặc định), `anthropic_provider`, `openai_compat` (OpenAI/Ollama), `echo` (test) + `registry` | domain |
 | `storage/` | `db.py` (pool psycopg 3), `migrator.py` + `migrations/NNN_*.sql`, `postgres_repo.py`, `quota_repo.py` | domain |
-| `ingest/`, `export/` | đọc TXT (tách `第X章`), xuất TXT | domain |
+| `ingest/`, `export/` | đọc và giải mã TXT (`SourceLoader.read_text`/`decode`: UTF-8, GB18030), xuất TXT | domain |
 | `container.py` | composition root: nơi duy nhất chọn adapter cụ thể, tạo pool, chạy migration | tất cả |
 | `interfaces/api` | `app.py`, `auth.py` (session cookie, CSRF header, chống brute-force), `privacy.py` (`X-Robots-Tag`, `robots.txt`), `routers/` theo nhóm, `web.py` (phục vụ SPA + fallback deep link) | application, container |
 | `interfaces/cli` | import/dịch/xuất/glossary để quản trị và debug; `hash-password`; `serve` | application, container |
@@ -66,7 +67,8 @@ reading-signal (≥30s, ≥60% cuộn) ─► PrefetchService ─► job backgro
 ## Điểm mở rộng thường gặp
 
 - **Provider LLM mới**: viết class kế thừa `StreamingProvider` (có `name`, `default_model`, `stream()`), phân loại lỗi thành các lớp lỗi trong `domain/ports.py`, rồi gọi `register_provider()` trong `registry.py`. Khai báo vào chuỗi qua `NT_CHAIN=provider:model,...`. Không rẽ nhánh theo tên provider trong pipeline/application.
-- **Định dạng nhập** (EPUB, crawl web): hiện thực `SourceLoader`, nối trong `container.py`.
+- **Định dạng nhập** (EPUB, crawl web): hiện thực `SourceLoader` (`read_text`/`decode` trả văn bản), nối trong `container.py`; tách chương dùng chung `domain/chapter_split.py`.
+- **Mẫu tiêu đề chương mới** (vd. `【第一章】`, `001.`): thêm regex trong `domain/chapter_split.py` kèm test; mọi đường import (CLI, API, xem trước) dùng chung.
 - **Định dạng xuất** (EPUB, DOCX): hiện thực `Exporter`, thêm vào dict `exporters`.
 - **Thay đổi schema**: thêm file `storage/migrations/NNN_<tên>.sql` mới (không sửa file đã chạy); runner tự áp dụng lúc khởi động.
 
@@ -80,6 +82,7 @@ Chi tiết và phương án bị loại xem `openspec/changes/mvp-web-reader/des
 - **SSE** cho streaming (một chiều, tự reconnect); reverse proxy phải tắt buffering (xem `docs/DEPLOY.md`).
 - **Buffer N+1**: tín hiệu đọc thật → dịch trước tối đa một chương, chỉ bằng bước 1 của chuỗi; quota dự phòng dành cho chương người dùng chủ động mở.
 - **PostgreSQL** dùng chung instance `shared-postgres`, database + role riêng, pool nhỏ (`NT_DB_POOL_MAX`), migration SQL tay có `pg_advisory_lock`. Test dùng database riêng `NT_TEST_DATABASE_URL`.
+- **Import có xem trước**: upload web không lưu ngay; draft (văn bản + kết quả tách) giữ trong bộ nhớ 60 phút, tối đa 3 draft, mất khi restart. File tiếng Việt lưu thành truyện "bản dịch có sẵn": chương Đã dịch, `provider = "import"`, không bao giờ gửi tới LLM.
 - **Một người dùng**: hash argon2 trong `NT_PASSWORD_HASH`, session lưu server-side (chỉ lưu SHA-256 token), mọi trang `noindex`.
 
 ## Ngôn ngữ giao diện "Thủy mặc · Chu sa"
