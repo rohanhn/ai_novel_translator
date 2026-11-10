@@ -15,7 +15,7 @@ from pathlib import PurePath
 
 from ..domain import chapter_split
 from ..domain.ports import SourceLoader
-from .services import ImportResult, LibraryService
+from .services import ImportResult, InvalidOperationError, LibraryService
 
 DRAFT_TTL = timedelta(minutes=60)
 MAX_DRAFTS = 3
@@ -39,6 +39,7 @@ class Draft:
     detected_lang: str
     plan: chapter_split.SplitPlan
     keep_front_matter: bool | None = None  # None: lựa chọn mặc định
+    novel_id: int | None = None  # có giá trị: draft cập nhật chương cho truyện này
     last_used: datetime = field(default_factory=_utcnow)
 
     @property
@@ -73,14 +74,19 @@ class ImportDraftService:
         return d
 
     # --- thao tác ---
-    def create(self, filename: str, data: bytes) -> Draft:
+    def create(self, filename: str, data: bytes, novel_id: int | None = None) -> Draft:
+        """Giải mã và tách chương. `novel_id`: draft để cập nhật chương của truyện đó (spec
+        `chapter-update`), truyện phải tồn tại."""
+        if novel_id is not None:
+            self.library.get_novel(novel_id)  # NotFoundError nếu không có
         text = self.loader.decode(data)
         if not text.strip():
             raise ValueError("File rỗng.")
         lines = chapter_split.split_lines(text)
         plan = chapter_split.plan(text)
         draft = Draft(secrets.token_urlsafe(16), filename, text, lines,
-                      chapter_split.detect_language(text), plan, last_used=self.clock())
+                      chapter_split.detect_language(text), plan, novel_id=novel_id,
+                      last_used=self.clock())
         with self._lock:
             self._purge(draft.last_used)
             while len(self._drafts) >= self.max_drafts:
@@ -116,6 +122,9 @@ class ImportDraftService:
         rồi xóa draft. Lỗi khi lưu thì giữ draft để người dùng thử lại."""
         with self._lock:
             d = self._take(draft_id)
+        if d.novel_id is not None:
+            raise InvalidOperationError(
+                "Bản xem trước này dùng để cập nhật chương của một truyện, không tạo truyện mới.")
         plan = chapter_split.apply(d.text, boundaries, keep_front_matter)
         result = self.library.import_text(d.text, (title or "").strip() or d.default_title,
                                           lang, plan)

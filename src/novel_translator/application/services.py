@@ -71,6 +71,18 @@ class ImportResult:
         return len(self.plan.chapters)
 
 
+def new_chapter(novel: Novel, index: int, title: str, body: str) -> Chapter:
+    """Chương mới lấy từ file: `pending`, hoặc với truyện bản dịch có sẵn (`vi`) thì lưu luôn ở
+    trạng thái Đã dịch, không bao giờ qua LLM. Dùng chung cho import và cập nhật chương."""
+    ch = Chapter(novel_id=novel.id, index=index, title=title, source_text=body)
+    if novel.pretranslated:
+        ch.translated_title, ch.translated_text = title, body
+        ch.status = ChapterStatus.TRANSLATED
+        ch.provider = IMPORT_PROVIDER
+        ch.glossary_version = novel.glossary_version
+    return ch
+
+
 class LibraryService:
     def __init__(self, repo: NovelRepository, loader: SourceLoader,
                  on_delete: Callable[[int], object] | None = None,
@@ -121,16 +133,8 @@ class LibraryService:
         if not plan.chapters:
             raise ValueError("Không tìm thấy nội dung trong file.")
         novel = self.repo.add_novel(Novel(title=title, source_lang=lang, target_lang="vi"))
-        chapters = []
-        for i, r in enumerate(plan.chapters):
-            ch = Chapter(novel_id=novel.id, index=i + 1, title=r.title, source_text=r.body)
-            if novel.pretranslated:
-                ch.translated_title, ch.translated_text = r.title, r.body
-                ch.status = ChapterStatus.TRANSLATED
-                ch.provider = IMPORT_PROVIDER
-                ch.glossary_version = novel.glossary_version
-            chapters.append(ch)
-        self.repo.add_chapters(chapters)
+        self.repo.add_chapters([new_chapter(novel, i + 1, r.title, r.body)
+                                for i, r in enumerate(plan.chapters)])
         return ImportResult(novel, plan, lang, detected)
 
     def get_novel(self, novel_id: int) -> Novel:
