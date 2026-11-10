@@ -52,6 +52,10 @@ class ConfirmationRequiredError(InvalidOperationError):
     """Thao tác làm mất dữ liệu (dịch lại chương đã biên tập) cần chủ sở hữu xác nhận."""
 
 
+class NovelBusyError(InvalidOperationError):
+    """Truyện đang được cập nhật chương, hoặc còn job dịch khi muốn tải lại cả bộ."""
+
+
 SUPPORTED_IMPORT_LANGS = ("zh", "vi")
 
 

@@ -13,7 +13,7 @@
 ## 2. Storage và job
 
 - [x] 2.1 Repo: `add_chapters` chèn thêm `glossary_outdated`, `possible_omission`; thêm `replace_chapters(novel_id, chapters)` (DELETE rồi chèn theo lô trong `unit_of_work`); cập nhật port `NovelRepository`. Kiểm tra bằng `tests/test_storage.py`: thay danh sách giữ đủ mọi trường, lỗi giữa chừng trong `unit_of_work` thì rollback nguyên trạng.
-- [ ] 2.2 `TranslationJobManager`: `has_jobs_for_novel`, context manager `hold_novel`, `NovelBusyError` từ `submit` khi đang giữ; `PrefetchService` trả `reason="updating"`. Kiểm tra bằng `tests/test_jobs.py` và `tests/test_prefetch.py`: submit trong lúc giữ bị từ chối, ra khỏi khối thì submit lại được, job của truyện khác không bị ảnh hưởng.
+- [x] 2.2 `TranslationJobManager`: `has_jobs_for_novel`, context manager `hold_novel`, `NovelBusyError` từ `submit` khi đang giữ; `PrefetchService` trả `reason="updating"`. Kiểm tra bằng `tests/test_jobs.py` và `tests/test_prefetch.py`: submit trong lúc giữ bị từ chối, ra khỏi khối thì submit lại được, job của truyện khác không bị ảnh hưởng.
 
 ## 3. Service cập nhật (application)
 

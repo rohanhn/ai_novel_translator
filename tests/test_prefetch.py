@@ -181,3 +181,11 @@ def test_unknown_chapter(env):
     nid, pre, *_ = env
     with pytest.raises(NotFoundError):
         pre.on_reading_signal(nid, 99, ReadingSignal.VISIBLE_30S)
+
+
+def test_prefetch_skipped_while_novel_is_updating(env):
+    nid, pre, jobs, *_ = env
+    with jobs.hold_novel(nid):
+        d = pre.on_reading_signal(nid, 3, ReadingSignal.EXPLICIT)
+    assert not d.started and d.reason == "updating"
+    assert jobs.get(nid, 4) is None

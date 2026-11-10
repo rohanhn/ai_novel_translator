@@ -9,7 +9,7 @@ from enum import Enum
 from ..domain.models import ChapterStatus
 from ..domain.ports import NovelRepository, QuotaTracker
 from .jobs import Lane, TranslationJobManager
-from .services import NotFoundError
+from .services import NotFoundError, NovelBusyError
 
 PREFETCH_PREF = "prefetch"
 
@@ -24,7 +24,7 @@ class ReadingSignal(str, Enum):
 class PrefetchDecision:
     started: bool
     reason: str  # started | no_next_chapter | already_translated | edited | in_progress
-    #              | disabled | primary_exhausted | pretranslated
+    #              | disabled | primary_exhausted | pretranslated | updating
     chapter_index: int | None = None
 
 
@@ -66,7 +66,10 @@ class PrefetchService:
             return no("primary_exhausted")
         # Độ sâu một chương: bỏ các prefetch còn chờ khác của truyện này (đã lỗi thời).
         self.jobs.cancel_queued_for_novel(novel_id, Lane.BACKGROUND)
-        self.jobs.submit(novel_id, target, Lane.BACKGROUND)
+        try:
+            self.jobs.submit(novel_id, target, Lane.BACKGROUND)
+        except NovelBusyError:
+            return no("updating")  # đang cập nhật chương: index có thể đổi, bỏ buffer lần này
         return PrefetchDecision(True, "started", target)
 
     def on_leave(self, novel_id: int) -> int:
