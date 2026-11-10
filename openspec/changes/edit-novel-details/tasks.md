@@ -28,7 +28,7 @@
 ## 5. Tài liệu và kiểm tra cuối
 
 - [x] 5.1 Cập nhật `docs/ARCHITECTURE.md` (adapter `media/` gồm xử lý ảnh và tải ảnh an toàn, port `CoverImageProcessor`/`CoverImageFetcher`, request mạng ra ngoài duy nhất là tải ảnh từ link, bảng `novel_covers`, quyết định lưu ảnh trong Postgres) và `CLAUDE.md` nếu đổi lệnh cài. Kiểm tra: `grep` tên module/bảng trong tài liệu khớp code.
-- [ ] 5.2 Chạy toàn bộ: `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`, `cd web && npm run check && npm run build && npm run test:e2e`, `openspec validate edit-novel-details --strict` (nếu chỉ báo INFO vì `web-reader` chưa có trong spec chính thì ghi lại). Kiểm tra: tất cả pass.
+- [x] 5.2 Chạy toàn bộ: `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`, `cd web && npm run check && npm run build && npm run test:e2e`, `openspec validate edit-novel-details --strict` (nếu chỉ báo INFO vì `web-reader` chưa có trong spec chính thì ghi lại). Kiểm tra: tất cả pass.
 
 ## Workflow follow-up
 
