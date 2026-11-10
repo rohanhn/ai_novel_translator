@@ -331,3 +331,113 @@ def test_apply_dedupes_and_sorts():
     from novel_translator.domain.chapter_split import apply
     p = apply(_numbered(100), [90, 1, 40, 40])
     assert p.boundaries == [1, 40, 90]
+
+
+# --- Cảnh báo (Requirement: Chapter number sequence / length warnings) -----------------------
+
+def _codes(ch):
+    return [w.code for w in ch.warnings]
+
+
+def _body(n=150):
+    return "Thân chương đủ dài. " * (n // 20 + 1)
+
+
+def test_number_gap_warning():
+    p = _plan(f"Chương 1\n{_body()}\nChương 2\n{_body()}\nChương 5\n{_body()}")
+    assert [_codes(c) for c in p.chapters] == [[], [], ["number_gap"]]
+    w = p.chapters[2].warnings[0]
+    assert w.params["missing_from"] == 3 and w.params["missing_to"] == 4
+    assert "3–4" in w.message
+
+
+def test_number_repeat_and_decrease():
+    body = "正文。" * 40
+    p = _plan(f"第九章\n{body}\n第十章\n{body}\n第十章\n{body}\n第八章\n{body}")
+    assert [_codes(c) for c in p.chapters] == [[], [], ["number_repeat"], ["number_decrease"]]
+
+
+def test_sequence_ignores_special_volume_and_user_boundaries():
+    from novel_translator.domain.chapter_split import apply
+    text = f"Chương 1\n{_body()}\nPhiên ngoại 1\n{_body()}\nChương 2\n{_body()}\ndòng thường\n{_body()}"
+    p = _plan(text)
+    assert all(_codes(c) == [] for c in p.chapters)
+    p2 = apply(text, p.boundaries + [6])  # tách tại "dòng thường": không có số → không cảnh báo
+    assert all("number" not in " ".join(_codes(c)) for c in p2.chapters)
+
+
+def test_too_short_warning():
+    p = _plan(f"Chương 1\n{_body()}\nChương 2\nNgắn quá, chỉ ba mươi ký tự.\nChương 3\n{_body()}")
+    assert [_codes(c) for c in p.chapters] == [[], ["too_short"], []]
+
+
+def test_too_long_warning():
+    normal = "a" * 6000
+    p = _plan(f"Chương 1\n{normal}\nChương 2\n{normal}\nChương 3\n{'b' * 45000}\nChương 4\n{normal}")
+    assert _codes(p.chapters[2]) == ["too_long"]
+    assert p.chapters[2].warnings[0].params == {"chars": 45000, "median": 6000}
+    # dài hơn 3× trung vị nhưng chưa tới 20.000 ký tự → không cảnh báo
+    q = _plan(f"Chương 1\n{'a' * 2000}\nChương 2\n{'a' * 2000}\nChương 3\n{'b' * 9000}")
+    assert _codes(q.chapters[2]) == []
+
+
+def test_front_matter_warning_reflects_choice():
+    from novel_translator.domain.chapter_split import apply
+    text = f"Kiếm Lai\nChương 1\n{_body()}"
+    assert [w.code for w in _plan(text).warnings] == ["front_matter"]
+    assert "bỏ đi" in _plan(text).warnings[0].message
+    assert "Mở đầu" in apply(text, [1], keep_front_matter=True).warnings[0].message
+
+
+def test_warnings_do_not_change_split():
+    p = _plan("Chương 1\nx\nChương 3\nx")
+    assert len(p.chapters) == 2 and p.boundaries == [0, 2]
+
+
+# --- Fixture từ file thật ---------------------------------------------------------------------
+
+FIXTURES = __import__("pathlib").Path(__file__).parent / "fixtures" / "split"
+
+
+def test_fixture_vietnamese_excerpt_mid_file():
+    from novel_translator.domain.chapter_split import detect_language
+    text = (FIXTURES / "kiem-lai-vi.txt").read_text(encoding="utf-8")
+    p = _plan(text)
+    assert detect_language(text) == "vi"
+    assert _titles(p) == ["Chương 1: Kinh trập", "Chương 2: Mở cửa", "Chương 3: Ngõ nhỏ"]
+    assert p.front_matter is None and p.warnings == []
+    ch1, ch2, ch3 = p.chapters
+    assert "gọi là “rồng ngẩng đầu”." in ch1.body
+    assert ch1.body.endswith("nhằm cầu xin đây là một điềm lành.")
+    assert ch2.body.startswith("Trời vừa tảng sáng")
+    assert "Chương này của đời hắn" in ch3.body  # câu nhắc tới "chương" không bị tách
+    assert all(c.warnings == [] for c in p.chapters)
+
+
+def test_fixture_chinese_raw():
+    from novel_translator.domain.chapter_split import detect_language
+    text = (FIXTURES / "lin-dong-zh.txt").read_text(encoding="utf-8")
+    p = _plan(text)
+    assert detect_language(text) == "zh"
+    assert _titles(p) == ["楔子", "第一卷 潜龙 · 第一章 林动", "第二章 修炼", "第三章 石符"]
+    assert p.front_matter.text == "武动乾坤\n作者：天蚕土豆" and p.front_matter.keep is False
+    assert [w.code for w in p.warnings] == ["front_matter"]
+    assert all(c.warnings == [] for c in p.chapters)
+    assert all("第一卷" not in c.body for c in p.chapters)
+
+
+# --- Hiệu năng --------------------------------------------------------------------------------
+
+def test_plan_50mb_under_10_seconds():
+    import time
+    para = "Trời vừa tảng sáng, gà còn chưa gáy thì Trần Bình An đã rời giường. " * 3 + "\n"
+    chapter = "Chương {n}: Tên chương\n" + para * 30
+    one = len(chapter.format(n=1).encode())
+    n = 50 * 1024 * 1024 // one + 1
+    text = "".join(chapter.format(n=i) for i in range(1, n + 1))
+    assert len(text.encode()) >= 50 * 1024 * 1024
+    t0 = time.perf_counter()
+    p = _plan(text)
+    elapsed = time.perf_counter() - t0
+    assert len(p.chapters) == n
+    assert elapsed < 10, f"plan() mất {elapsed:.1f}s"

@@ -224,6 +224,9 @@ def detect_language(text: str) -> str:
 # --- Kế hoạch tách ---------------------------------------------------------------------------
 
 FRONT_MATTER_KEEP_CHARS = 200
+SHORT_CHAPTER_CHARS = 100
+LONG_CHAPTER_CHARS = 20_000
+LONG_CHAPTER_MEDIAN_FACTOR = 3
 FRONT_MATTER_TITLE = "Mở đầu"
 FALLBACK_TITLE = "Chương 1"
 
@@ -353,4 +356,57 @@ def _build(lines: list[str], boundaries: list[int], keep_front: bool | None) -> 
             h.kind if h else None, h.number if h else None, [],
         ))
         prev_end = start + 1
+    if front:
+        what = f'giữ làm chương "{FRONT_MATTER_TITLE}"' if front.keep else "bỏ đi"
+        warnings.append(SplitWarning(
+            "front_matter",
+            f"Có {front.chars} ký tự trước tiêu đề đầu tiên; phần này sẽ được {what}.",
+            {"chars": front.chars, "keep": front.keep},
+        ))
+    _sequence_warnings(chapters)
+    _length_warnings(chapters)
     return SplitPlan(len(lines), boundaries, front, chapters, warnings)
+
+
+def _sequence_warnings(chapters: list[SplitChapter]) -> None:
+    """Số chương không bằng số trước + 1: nhảy cóc, trùng, lùi. Bỏ qua tiêu đề đặc biệt, quyển
+    và ranh giới người dùng thêm (không có số)."""
+    prev: int | None = None
+    for ch in chapters:
+        if ch.kind is not HeadingKind.CHAPTER or ch.heading_number is None:
+            continue
+        n = ch.heading_number
+        if prev is not None:
+            if n == prev:
+                ch.warnings.append(SplitWarning(
+                    "number_repeat", f"Trùng số chương {n} với chương trước.", {"number": n}))
+            elif n < prev:
+                ch.warnings.append(SplitWarning(
+                    "number_decrease", f"Số chương lùi từ {prev} xuống {n}.",
+                    {"previous": prev, "number": n}))
+            elif n > prev + 1:
+                first, last = prev + 1, n - 1
+                missing = f"chương {first}" if first == last else f"các chương {first}–{last}"
+                ch.warnings.append(SplitWarning(
+                    "number_gap", f"Thiếu {missing} (số chương nhảy từ {prev} lên {n}).",
+                    {"previous": prev, "number": n, "missing_from": first, "missing_to": last}))
+        prev = n
+
+
+def _length_warnings(chapters: list[SplitChapter]) -> None:
+    if not chapters:
+        return
+    sizes = sorted(c.chars for c in chapters)
+    mid = len(sizes) // 2
+    median = sizes[mid] if len(sizes) % 2 else (sizes[mid - 1] + sizes[mid]) / 2
+    for ch in chapters:
+        if ch.chars < SHORT_CHAPTER_CHARS:
+            ch.warnings.append(SplitWarning(
+                "too_short",
+                f"Chương rất ngắn ({ch.chars} ký tự), có thể là dòng bị nhận nhầm thành tiêu đề.",
+                {"chars": ch.chars}))
+        elif ch.chars > LONG_CHAPTER_CHARS and ch.chars > LONG_CHAPTER_MEDIAN_FACTOR * median:
+            ch.warnings.append(SplitWarning(
+                "too_long",
+                f"Chương rất dài ({ch.chars} ký tự), có thể còn tiêu đề chưa được nhận ra.",
+                {"chars": ch.chars, "median": int(median)}))
