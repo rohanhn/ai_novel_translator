@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from ...application.imports import Draft
+from ...domain.chapter_split import SplitWarning
 from ...domain.models import (
     Chapter,
     GlossaryEntry,
@@ -21,6 +24,7 @@ class NovelOut(BaseModel):
     title: str
     source_lang: str
     target_lang: str
+    pretranslated: bool  # bản dịch có sẵn (import từ file tiếng Việt): không dịch bằng model
     glossary_version: int
     created_at: datetime
     last_read_at: datetime | None
@@ -28,8 +32,8 @@ class NovelOut(BaseModel):
     @classmethod
     def of(cls, n: Novel) -> NovelOut:
         return cls(id=n.id, title=n.title, source_lang=n.source_lang, target_lang=n.target_lang,
-                   glossary_version=n.glossary_version, created_at=n.created_at,
-                   last_read_at=n.last_read_at)
+                   pretranslated=n.pretranslated, glossary_version=n.glossary_version,
+                   created_at=n.created_at, last_read_at=n.last_read_at)
 
 
 class LibraryItem(NovelOut):
@@ -132,3 +136,85 @@ class ProgressOut(ProgressIn):
     @classmethod
     def of(cls, p: ReadingProgress) -> ProgressOut:
         return cls(chapter_index=p.chapter_index, position=p.position, updated_at=p.updated_at)
+
+
+# ---------- import có xem trước (design D3) ----------
+EXCERPT_CHARS = 80
+
+
+def _excerpt(text: str) -> str:
+    one_line = " ".join(text.split())
+    return one_line[:EXCERPT_CHARS] + ("…" if len(one_line) > EXCERPT_CHARS else "")
+
+
+class SplitWarningOut(BaseModel):
+    code: str
+    message: str
+    params: dict
+
+    @classmethod
+    def of(cls, w: SplitWarning) -> SplitWarningOut:
+        return cls(code=w.code, message=w.message, params=w.params)
+
+
+class ImportChapterOut(BaseModel):
+    number: int
+    start_line: int
+    end_line: int
+    title: str
+    chars: int
+    excerpt: str
+    warnings: list[SplitWarningOut]
+
+
+class FrontMatterOut(BaseModel):
+    start_line: int
+    end_line: int
+    chars: int
+    excerpt: str
+    keep: bool
+
+
+class ImportPreview(BaseModel):
+    id: str
+    filename: str
+    default_title: str
+    detected_lang: str  # zh | vi | unknown
+    line_count: int
+    boundaries: list[int]
+    front_matter: FrontMatterOut | None
+    chapters: list[ImportChapterOut]
+    warnings: list[SplitWarningOut]
+
+    @classmethod
+    def of(cls, d: Draft) -> ImportPreview:
+        p = d.plan
+        fm = p.front_matter
+        return cls(
+            id=d.id, filename=d.filename, default_title=d.default_title,
+            detected_lang=d.detected_lang, line_count=p.line_count, boundaries=p.boundaries,
+            front_matter=FrontMatterOut(start_line=fm.start_line, end_line=fm.end_line,
+                                        chars=fm.chars, excerpt=_excerpt(fm.text), keep=fm.keep)
+            if fm else None,
+            chapters=[ImportChapterOut(
+                number=c.number, start_line=c.start_line, end_line=c.end_line, title=c.title,
+                chars=c.chars, excerpt=_excerpt(c.body),
+                warnings=[SplitWarningOut.of(w) for w in c.warnings],
+            ) for c in p.chapters],
+            warnings=[SplitWarningOut.of(w) for w in p.warnings],
+        )
+
+
+class ImportAdjustIn(BaseModel):
+    boundaries: list[int]
+    keep_front_matter: bool | None = None
+
+
+class ImportCommitIn(ImportAdjustIn):
+    title: str | None = Field(None, max_length=300)
+    lang: Literal["zh", "vi"] | None = None
+
+
+class ImportLinesOut(BaseModel):
+    start: int
+    lines: list[str]

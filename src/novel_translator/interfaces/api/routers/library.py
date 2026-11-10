@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 
@@ -21,27 +21,31 @@ def library(c: Container = Depends(get_container)):
     return [LibraryItem.of_summary(s) for s in c.library.overview()]
 
 
-@router.post("", response_model=NovelOut, status_code=201)
-async def upload(file: UploadFile, title: str | None = Form(None),
-                 c: Container = Depends(get_container)):
-    """Nhận file `.txt` (≤50 MB). Ghi ra file tạm để dùng đúng quy tắc tách chương và đoán
-    encoding của lệnh import. Không có title → lấy tên file."""
+async def read_txt_upload(file: UploadFile) -> tuple[str, bytes]:
+    """Kiểm tra dùng chung cho mọi upload TXT: đuôi `.txt`, ≤50 MB, không rỗng."""
     name = Path(file.filename or "novel.txt").name
     if not name.lower().endswith(".txt"):
         raise HTTPException(400, "Chỉ nhận file .txt")
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / name
-        size = 0
-        with path.open("wb") as out:
-            while chunk := await file.read(_CHUNK):
-                size += len(chunk)
-                if size > MAX_UPLOAD_BYTES:
-                    raise HTTPException(413, "File lớn hơn 50 MB.")
-                out.write(chunk)
-        if size == 0:
-            raise HTTPException(400, "File rỗng.")
-        novel = c.library.import_novel(path, (title or "").strip() or None).novel
-    return NovelOut.of(novel)
+    chunks, size = [], 0
+    while chunk := await file.read(_CHUNK):
+        size += len(chunk)
+        if size > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "File lớn hơn 50 MB.")
+        chunks.append(chunk)
+    if size == 0:
+        raise HTTPException(400, "File rỗng.")
+    return name, b"".join(chunks)
+
+
+@router.post("", response_model=NovelOut, status_code=201)
+async def upload(file: UploadFile, title: str | None = Form(None),
+                 lang: Literal["zh", "vi"] | None = Form(None),
+                 c: Container = Depends(get_container)):
+    """Lưu ngay (cho script): tách chương mặc định, ngôn ngữ tự nhận diện hoặc `lang`.
+    Web dùng `/api/imports` (xem trước rồi xác nhận). Không có title → lấy tên file."""
+    name, data = await read_txt_upload(file)
+    res = c.library.import_bytes(data, (title or "").strip() or Path(name).stem, lang)
+    return NovelOut.of(res.novel)
 
 
 @router.get("/{novel_id}", response_model=NovelOut)

@@ -8,10 +8,12 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from ...application.imports import DraftExpiredError
 from ...application.services import (
     ConfirmationRequiredError,
     InvalidOperationError,
     NotFoundError,
+    PreTranslatedError,
 )
 from ...domain.ports import DailyQuotaError, RateQuotaError, TranslationError
 
@@ -27,6 +29,14 @@ async def _not_found(_: Request, e: NotFoundError):
 
 async def _confirmation(_: Request, e: ConfirmationRequiredError):
     return _json(409, str(e), code="confirmation_required")
+
+
+async def _pretranslated(_: Request, e: PreTranslatedError):
+    return _json(409, str(e), code="pretranslated")
+
+
+async def _draft_expired(_: Request, e: DraftExpiredError):
+    return _json(410, str(e), code="draft_expired")
 
 
 async def _invalid(_: Request, e: InvalidOperationError):
@@ -60,7 +70,9 @@ def install(app: FastAPI) -> None:
     # Starlette chọn handler theo MRO nên lớp con cụ thể hơn được ưu tiên.
     app.add_exception_handler(NotFoundError, _not_found)
     app.add_exception_handler(ConfirmationRequiredError, _confirmation)
+    app.add_exception_handler(PreTranslatedError, _pretranslated)
     app.add_exception_handler(InvalidOperationError, _invalid)
+    app.add_exception_handler(DraftExpiredError, _draft_expired)
     app.add_exception_handler(ValueError, _bad_request)
     app.add_exception_handler(DailyQuotaError, _daily_quota)
     app.add_exception_handler(RateQuotaError, _rate_quota)

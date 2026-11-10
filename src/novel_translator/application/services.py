@@ -91,6 +91,10 @@ class LibraryService:
         """Đọc file, tách theo kết quả mặc định của `chapter_split.plan` rồi lưu ngay."""
         return self.import_text(self.loader.read_text(path), title or path.stem, lang)
 
+    def import_bytes(self, data: bytes, title: str, lang: str | None = None) -> ImportResult:
+        """Như `import_novel` nhưng từ nội dung file đã nhận (upload web, lưu ngay)."""
+        return self.import_text(self.loader.decode(data), title, lang)
+
     def import_text(
         self, text: str, title: str, lang: str | None = None,
         plan: chapter_split.SplitPlan | None = None,
