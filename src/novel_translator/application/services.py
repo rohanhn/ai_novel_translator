@@ -21,6 +21,7 @@ from ..domain.models import (
 )
 from ..domain.novel_details import UNSET, CoverImage, Unset, normalize_details
 from ..domain.ports import (
+    CoverImageFetcher,
     CoverImageProcessor,
     DailyQuotaError,
     Exporter,
@@ -69,11 +70,13 @@ class ImportResult:
 class LibraryService:
     def __init__(self, repo: NovelRepository, loader: SourceLoader,
                  on_delete: Callable[[int], object] | None = None,
-                 covers: CoverImageProcessor | None = None):
+                 covers: CoverImageProcessor | None = None,
+                 cover_fetcher: CoverImageFetcher | None = None):
         self.repo = repo
         self.loader = loader
         self.on_delete = on_delete  # vd. hủy prefetch đang chờ của truyện
         self.covers = covers  # kiểm tra + chuẩn hoá ảnh bìa (adapter nối trong container)
+        self.cover_fetcher = cover_fetcher  # tải ảnh từ link, chặn địa chỉ nội bộ
 
     def overview(self) -> list[NovelSummary]:
         return self.repo.library_overview()
@@ -161,6 +164,13 @@ class LibraryService:
     def process_cover(self, data: bytes) -> CoverImage:
         """Kiểm tra + chuẩn hoá ảnh, không lưu (dùng cho xem trước). Lỗi → `InvalidImageError`."""
         return self._processor().process(data)
+
+    def preview_cover_from_url(self, url: str) -> CoverImage:
+        """Tải ảnh từ link rồi xử lý như ảnh upload; KHÔNG lưu gì (chỉ để xem trước).
+        Lỗi tải → `CoverFetchError`; không phải ảnh → `InvalidImageError`."""
+        if self.cover_fetcher is None:
+            raise RuntimeError("Chưa cấu hình bộ tải ảnh từ link.")
+        return self.process_cover(self.cover_fetcher.fetch(url))
 
     def set_cover(self, novel_id: int, data: bytes) -> Novel:
         """Thay ảnh bìa. Ảnh không hợp lệ → `InvalidImageError`, ảnh cũ giữ nguyên."""

@@ -22,9 +22,10 @@ from .application.services import (
     TranslationService,
 )
 from .config import Settings
-from .domain.ports import CoverImageProcessor, LLMProvider
+from .domain.ports import CoverImageFetcher, CoverImageProcessor, LLMProvider
 from .export.txt_exporter import TxtExporter
 from .ingest.txt_loader import TxtLoader
+from .media.http_fetcher import SafeHttpImageFetcher
 from .media.pillow_cover import PillowCoverProcessor
 from .providers import create_provider
 from .providers.chain import ChainLink, ChainProvider
@@ -53,6 +54,7 @@ class Container:
     provider_factory: Callable[[str | None, str | None], LLMProvider]
     pool: ConnectionPool
     cover_processor: CoverImageProcessor
+    cover_fetcher: CoverImageFetcher
 
     def close(self) -> None:
         self.jobs.shutdown()
@@ -63,7 +65,8 @@ __all__ = ["Container", "DatabaseConfigError", "build_container", "get_container
 
 
 def build_container(
-    settings: Settings | None = None, pool: ConnectionPool | None = None
+    settings: Settings | None = None, pool: ConnectionPool | None = None,
+    cover_fetcher: CoverImageFetcher | None = None,
 ) -> Container:
     """Nối adapter. Không có `pool` thì mở pool từ NT_DATABASE_URL (lỗi → DatabaseConfigError),
     áp dụng migration còn thiếu và đưa chương `translating` (job mất do restart) về `pending`."""
@@ -110,8 +113,10 @@ def build_container(
     prefetch = PrefetchService(repo, jobs, quota)
     loader = TxtLoader()
     cover_processor = PillowCoverProcessor()
+    # Test truyền bộ tải ảnh giả để không bao giờ chạm mạng thật.
+    cover_fetcher = cover_fetcher or SafeHttpImageFetcher()
     library = LibraryService(repo, loader, on_delete=jobs.cancel_queued_for_novel,
-                             covers=cover_processor)
+                             covers=cover_processor, cover_fetcher=cover_fetcher)
     return Container(
         settings=settings,
         library=library,
@@ -133,6 +138,7 @@ def build_container(
         provider_factory=provider_factory,
         pool=pool,
         cover_processor=cover_processor,
+        cover_fetcher=cover_fetcher,
     )
 
 
