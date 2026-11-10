@@ -171,3 +171,50 @@ def test_edit_invalid_or_unknown_novel_fails(use, sample_txt):
     assert use.library.get_novel(nid).author is None
     r = runner.invoke(cli.app, ["edit", "999", "--title", "X"])
     assert r.exit_code != 0 and "Không có truyện" in r.output
+
+
+# --- chapter-update: novel import --into -------------------------------------------------------
+
+
+def _zh_file(tmp_path, name, numbers):
+    p = tmp_path / name
+    p.write_text("\n".join(f"第{n}章 标题{n}\n" + f"林动第{n}章的正文。" * 5 for n in numbers),
+                 encoding="utf-8")
+    return p
+
+
+def test_cli_append(use, tmp_path):
+    c = use(provider="echo")
+    r = runner.invoke(cli.app, ["import", str(_zh_file(tmp_path, "a.txt", range(1, 6)))])
+    assert r.exit_code == 0, r.output
+    nid = c.library.list_novels()[0].id
+    r = runner.invoke(cli.app, ["import", str(_zh_file(tmp_path, "b.txt", range(1, 26))),
+                                "--into", str(nid)])
+    assert r.exit_code == 0, r.output
+    assert "sau chương 5 '第5章 标题5'" in r.output and "Đã thêm 20 chương" in r.output
+    assert len(c.repo.list_chapters(nid)) == 25
+    assert len(c.library.list_novels()) == 1
+
+
+def test_cli_cannot_place_the_file(use, tmp_path):
+    c = use(provider="echo")
+    runner.invoke(cli.app, ["import", str(_zh_file(tmp_path, "a.txt", range(1, 6)))])
+    nid = c.library.list_novels()[0].id
+    odd = tmp_path / "odd.txt"
+    odd.write_text("番外 一\n番外内容一\n番外 二\n番外内容二", encoding="utf-8")
+    r = runner.invoke(cli.app, ["import", str(odd), "--into", str(nid)])
+    assert r.exit_code == 1 and "web" in r.output
+    assert len(c.repo.list_chapters(nid)) == 5
+
+
+def test_cli_append_nothing_new_and_unknown_novel(use, tmp_path):
+    c = use(provider="echo")
+    f = _zh_file(tmp_path, "a.txt", range(1, 4))
+    runner.invoke(cli.app, ["import", str(f)])
+    nid = c.library.list_novels()[0].id
+    r = runner.invoke(cli.app, ["import", str(f), "--into", str(nid)])
+    assert r.exit_code == 1 and "không có chương mới" in r.output
+    r = runner.invoke(cli.app, ["import", str(f), "--into", "999999"])
+    assert r.exit_code == 1
+    r = runner.invoke(cli.app, ["import", str(f), "--into", str(nid), "--lang", "zh"])
+    assert r.exit_code == 1

@@ -189,6 +189,23 @@ class ChapterUpdateService:
         self.repo.add_chapters(added)
         return UpdateResult(novel, UpdateMode.APPEND, last + len(added), added=len(added))
 
+    def append_text(self, novel_id: int, text: str
+                    ) -> tuple[UpdateResult, chapter_merge.AppendPlan]:
+        """Thêm chương thẳng từ văn bản (CLI, design D7): cách tách mặc định, điểm nối tự động,
+        không có bước xem trước. Không tìm được chỗ nối → `StartRequiredError`."""
+        novel = self.repo.get_novel(novel_id)
+        if novel is None:
+            raise NotFoundError(f"Không có truyện id={novel_id}")
+        if not text.strip():
+            raise ValueError("File rỗng.")
+        self._check_language(novel, chapter_split.detect_language(text))
+        split = chapter_split.plan(text)
+        if not split.chapters:
+            raise ValueError("Không tìm thấy nội dung trong file.")
+        chapters = self.repo.list_chapters(novel.id)
+        plan = chapter_merge.plan_append([_stored_ref(c) for c in chapters], _incoming(split))
+        return self._append(novel, chapters, plan), plan
+
     def _apply_append(self, draft: Draft, boundaries: list[int], keep_front_matter: bool | None,
                       start: int | None, revision: str) -> UpdateResult:
         preview, chapters, _ = self._compute(draft, UpdateMode.APPEND, boundaries,

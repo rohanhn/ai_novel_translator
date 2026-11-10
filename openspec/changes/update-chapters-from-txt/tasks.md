@@ -31,7 +31,7 @@
 - [x] 4.1 API theo design D5: field `novel_id` trong `POST /api/imports`, `ImportPreview.novel_id`, `POST /api/imports/{id}/update-preview`, `POST /api/imports/{id}/update`, schema `UpdatePreview`/`UpdateResult`, ánh xạ lỗi 404/410/422/409. Kiểm tra bằng `tests/test_api_chapter_update.py`:
   - các scenario "Upload for an existing novel", "Unknown novel", "Preview expired", "Mode missing", "No anchor and no usable numbers" (422 khi thiếu `start`);
   - các route yêu cầu session và header CSRF.
-- [ ] 4.2 CLI `novel import <file> --into <id>` (design D7): in neo và số chương thêm; thoát mã 1 khi `needs_start` hoặc không có chương mới. Kiểm tra bằng `tests/test_cli.py` (CliRunner) theo scenario "CLI append" và "CLI cannot place the file".
+- [x] 4.2 CLI `novel import <file> --into <id>` (design D7): in neo và số chương thêm; thoát mã 1 khi `needs_start` hoặc không có chương mới. Kiểm tra bằng `tests/test_cli.py` (CliRunner) theo scenario "CLI append" và "CLI cannot place the file".
 - [ ] 4.3 Cập nhật `docs/ARCHITECTURE.md`: bảng lớp thêm `domain/chapter_merge.py` và `application/chapter_update.py`; ghi chú khóa so khớp là điểm mở rộng cho nhập từ URL; README hoặc `--help` của CLI nêu `--into`. Kiểm tra bằng `grep` tên module thật trong tài liệu và `.venv/bin/novel import --help` có `--into`.
 
 ## 5. Web
