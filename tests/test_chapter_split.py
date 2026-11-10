@@ -147,3 +147,44 @@ def test_not_headings(line):
 ])
 def test_volume_headings(line, expected):
     assert classify_line(line) == expected
+
+
+# --- Requirement: Language detection ---------------------------------------------------------
+
+def test_detect_chinese():
+    from novel_translator.domain.chapter_split import detect_language
+    assert detect_language("第一章 少年\n林动站在山上，看着远方的青阳镇，心中暗暗发誓一定要变强。") == "zh"
+
+
+def test_detect_vietnamese():
+    from novel_translator.domain.chapter_split import detect_language
+    text = "Chương 2: Mở cửa\nTrời vừa tảng sáng, gà còn chưa gáy thì Trần Bình An đã rời giường."
+    assert detect_language(text) == "vi"
+
+
+def test_detect_vietnamese_decomposed():
+    import unicodedata
+
+    from novel_translator.domain.chapter_split import detect_language
+    assert detect_language(unicodedata.normalize("NFD", "Đi đâu đấy?")) == "vi"
+
+
+def test_detect_unknown_plain_latin():
+    from novel_translator.domain.chapter_split import detect_language
+    assert detect_language("Chapter 1\nThe quick brown fox jumps over the lazy dog.") == "unknown"
+    assert detect_language("") == "unknown"
+    assert detect_language("12345 ... !!!") == "unknown"
+
+
+def test_detect_vietnamese_convert_with_few_han():
+    """Bản convert lẫn ít chữ Hán (chú thích tên) vẫn là tiếng Việt."""
+    from novel_translator.domain.chapter_split import detect_language
+    text = ("Lâm Động (林动) đứng trên núi nhìn về phía trấn Thanh Dương (青阳镇), "
+            "trong lòng thầm thề nhất định phải trở nên mạnh mẽ hơn bất cứ ai.")
+    assert detect_language(text) == "vi"
+
+
+def test_detect_uses_only_leading_sample():
+    from novel_translator.domain.chapter_split import LANG_SAMPLE_CHARS, detect_language
+    text = "林" * LANG_SAMPLE_CHARS + "Trần Bình An đã rời giường. " * 50_000
+    assert detect_language(text) == "zh"

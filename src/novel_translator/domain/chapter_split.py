@@ -183,3 +183,39 @@ def find_headings(lines: list[str]) -> list[Heading]:
             kind, number = result
             found.append(Heading(i, kind, number, unicodedata.normalize("NFC", line.strip())))
     return found
+
+
+# --- Ngôn ngữ --------------------------------------------------------------------------------
+
+LANG_SAMPLE_CHARS = 200_000
+ZH_HAN_RATIO = 0.3
+# Chữ cái chỉ có trong tiếng Việt (sau NFC): ă â đ ê ô ơ ư và các nguyên âm mang dấu thanh.
+_VI_LETTERS = set(
+    "ăâđêôơư"
+    "àáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ"
+)
+
+
+def _is_han(c: str) -> bool:
+    o = ord(c)
+    return (0x4E00 <= o <= 0x9FFF or 0x3400 <= o <= 0x4DBF or 0x20000 <= o <= 0x2A6DF
+            or 0xF900 <= o <= 0xFAFF)
+
+
+def detect_language(text: str) -> str:
+    """`zh` khi chữ Hán ≥30% số chữ cái; không thì `vi` nếu có chữ cái đặc trưng tiếng Việt;
+    còn lại `unknown`. Chỉ xét 200.000 ký tự đầu."""
+    sample = unicodedata.normalize("NFC", text[:LANG_SAMPLE_CHARS])
+    han = latin = 0
+    vi = False
+    for c in sample:
+        if _is_han(c):
+            han += 1
+        elif c.isalpha():
+            latin += 1
+            if not vi and c.lower() in _VI_LETTERS:
+                vi = True
+    letters = han + latin
+    if letters and han / letters >= ZH_HAN_RATIO:
+        return "zh"
+    return "vi" if vi else "unknown"
