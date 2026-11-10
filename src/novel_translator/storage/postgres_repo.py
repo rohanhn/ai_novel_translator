@@ -115,17 +115,17 @@ class PostgresRepository:
     # --- chapters ---
     def add_chapters(self, chapters: list[Chapter]) -> list[Chapter]:
         with self._connection() as conn:
-            for ch in chapters:
-                row = conn.execute(
-                    "INSERT INTO chapters (novel_id, idx, title, source_text, translated_title,"
-                    " translated_text, status, provider, model, chain_step, glossary_version,"
-                    " updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                    " RETURNING id",
-                    (ch.novel_id, ch.index, ch.title, ch.source_text, ch.translated_title,
-                     ch.translated_text, ch.status.value, ch.provider, ch.model, ch.chain_step,
-                     ch.glossary_version, ch.updated_at),
-                ).fetchone()
-                ch.id = row["id"]
+            _insert_chapters(conn, chapters)
+        return chapters
+
+    def replace_chapters(self, novel_id: int, chapters: list[Chapter]) -> list[Chapter]:
+        """Thay toàn bộ chương của truyện (xóa rồi chèn lại) trong một transaction. Không bảng
+        nào tham chiếu `chapters.id` nên đổi id không ảnh hưởng dữ liệu khác."""
+        if any(ch.novel_id != novel_id for ch in chapters):
+            raise ValueError("Mọi chương phải thuộc truyện đang thay.")
+        with self.unit_of_work(), self._connection() as conn:
+            conn.execute("DELETE FROM chapters WHERE novel_id = %s", (novel_id,))
+            _insert_chapters(conn, chapters)
         return chapters
 
     def get_chapter(self, novel_id: int, index: int) -> Chapter | None:
@@ -340,6 +340,29 @@ def _novel(r: dict[str, Any]) -> Novel:
                  created_at=r["created_at"], last_read_at=r["last_read_at"],
                  author=r["author"], description=r["description"],
                  cover_updated_at=r["cover_updated_at"])
+
+
+_INSERT_CHAPTER = (
+    "INSERT INTO chapters (novel_id, idx, title, source_text, translated_title, translated_text,"
+    " status, provider, model, chain_step, glossary_version, glossary_outdated, possible_omission,"
+    " updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id"
+)
+
+
+def _insert_chapters(conn: Connection, chapters: list[Chapter]) -> None:
+    """Chèn theo lô (một round-trip pipeline) và gán lại id cho từng chương."""
+    if not chapters:
+        return
+    with conn.cursor() as cur:
+        cur.executemany(_INSERT_CHAPTER, [
+            (ch.novel_id, ch.index, ch.title, ch.source_text, ch.translated_title,
+             ch.translated_text, ch.status.value, ch.provider, ch.model, ch.chain_step,
+             ch.glossary_version, ch.glossary_outdated, ch.possible_omission, ch.updated_at)
+            for ch in chapters
+        ], returning=True)
+        for ch in chapters:
+            ch.id = cur.fetchone()["id"]
+            cur.nextset()
 
 
 def _chapter(r: dict[str, Any]) -> Chapter:
