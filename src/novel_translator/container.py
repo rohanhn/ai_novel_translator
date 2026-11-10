@@ -22,9 +22,10 @@ from .application.services import (
     TranslationService,
 )
 from .config import Settings
-from .domain.ports import LLMProvider
+from .domain.ports import CoverImageProcessor, LLMProvider
 from .export.txt_exporter import TxtExporter
 from .ingest.txt_loader import TxtLoader
+from .media.pillow_cover import PillowCoverProcessor
 from .providers import create_provider
 from .providers.chain import ChainLink, ChainProvider
 from .security import verify_password
@@ -51,6 +52,7 @@ class Container:
     quota: PostgresQuotaTracker
     provider_factory: Callable[[str | None, str | None], LLMProvider]
     pool: ConnectionPool
+    cover_processor: CoverImageProcessor
 
     def close(self) -> None:
         self.jobs.shutdown()
@@ -128,6 +130,7 @@ def build_container(
         quota=quota,
         provider_factory=provider_factory,
         pool=pool,
+        cover_processor=PillowCoverProcessor(),
     )
 
 
