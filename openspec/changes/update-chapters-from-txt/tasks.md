@@ -36,7 +36,7 @@
 
 ## 5. Web
 
-- [ ] 5.1 Client API và kiểu `UpdatePreview`/`UpdateResult` trong `web/src/lib/`. Nút "Cập nhật từ txt" trên trang truyện mở `UpdateDialog.svelte`, gồm bước chọn file và bước `ImportPreview` (ẩn tên và ngôn ngữ). Kiểm tra `npm run check` không lỗi.
+- [x] 5.1 Client API và kiểu `UpdatePreview`/`UpdateResult` trong `web/src/lib/`. Nút "Cập nhật từ txt" trên trang truyện mở `UpdateDialog.svelte`, gồm bước chọn file và bước `ImportPreview` (ẩn tên và ngôn ngữ). Kiểm tra `npm run check` không lỗi.
 - [ ] 5.2 `UpdateChanges.svelte` (design D6):
   - radio chế độ không chọn sẵn; xác nhận chỉ bật khi đã chọn;
   - append: neo, chương sẽ thêm, cảnh báo khoảng trống, chọn chương bắt đầu khi `needs_start`, thông báo `differing`;

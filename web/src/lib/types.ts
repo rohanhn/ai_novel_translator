@@ -61,6 +61,7 @@ export type ImportChapter = {
 };
 export type ImportPreview = {
 	id: string;
+	novel_id: number | null;
 	filename: string;
 	default_title: string;
 	detected_lang: 'zh' | 'vi' | 'unknown';
@@ -77,3 +78,43 @@ export type ImportPreview = {
 	warnings: SplitWarning[];
 };
 export type ImportLang = 'zh' | 'vi';
+
+// Cập nhật chương từ TXT (spec chapter-update).
+export type UpdateMode = 'append' | 'replace';
+export type StoredChapterRef = { index: number; title: string; status: string };
+export type FileChapterRef = { position: number; title: string };
+export type ProgressMove = {
+	from_index: number;
+	from_position: number;
+	to_index: number;
+	to_position: number;
+};
+export type UpdatePreview = {
+	mode: UpdateMode;
+	revision: string;
+	stored_count: number;
+	incoming_count: number;
+	warnings: SplitWarning[];
+	anchor: { index: number; title: string; position: number; match: 'content' | 'title' } | null;
+	needs_start: boolean;
+	nothing_new: boolean;
+	to_add: FileChapterRef[];
+	differing: StoredChapterRef[];
+	counts: { reuse: number; changed: number; new: number; missing: number } | null;
+	changed: StoredChapterRef[];
+	missing: StoredChapterRef[];
+	edited_lost: StoredChapterRef[];
+	progress: ProgressMove | null;
+};
+export type UpdateResult = {
+	novel: Novel;
+	mode: UpdateMode;
+	chapter_count: number;
+	added: number;
+	reused: number;
+	changed: number;
+	new: number;
+	kept: number;
+	deleted: number;
+	progress: ProgressMove | null;
+};
