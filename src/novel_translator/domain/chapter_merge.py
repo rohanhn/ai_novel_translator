@@ -239,6 +239,27 @@ class ReplacePlan:
                 return i
         return None
 
+    def remap_progress(self, stored_index: int, position: float) -> tuple[int, float]:
+        """Vị trí đọc mới (spec "Reading progress follows chapters"). Chương đang đọc còn nguyên
+        nội dung (reuse/kept) → giữ vị trí cuộn; nội dung đổi hoặc bị xóa → chương gần nhất phía
+        trước còn nguyên nội dung, từ đầu chương; không có → chương 1."""
+        intact = (EntryKind.REUSE, EntryKind.KEPT)
+        at = self.new_index(stored_index)
+        if at is not None:
+            if self.entries[at - 1].kind in intact:
+                return at, position
+            for i in range(at - 1, 0, -1):
+                if self.entries[i - 1].kind in intact:
+                    return i, 0.0
+            return 1, 0.0
+        # Chương đang đọc bị xóa: lùi theo thứ tự cũ tới chương còn nguyên nội dung.
+        best: tuple[int, int] | None = None  # (index cũ, index mới)
+        for i, e in enumerate(self.entries, start=1):
+            if (e.kind in intact and e.stored.index < stored_index
+                    and (best is None or e.stored.index > best[0])):
+                best = (e.stored.index, i)
+        return (best[1], 0.0) if best else (1, 0.0)
+
 
 def _greedy_pass(incoming_keys: list, stored: list[StoredRef], key_of: Callable[[StoredRef], object],
                  matched: dict[int, StoredRef]) -> None:

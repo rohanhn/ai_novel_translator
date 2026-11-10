@@ -289,3 +289,59 @@ def test_content_match_wins_over_title_match():
     # File có hai chương cùng tiêu đề 2: bản đúng nội dung phải lấy chương cũ 2.
     plan = cm.plan_replace(stored_range(1, 2), incoming(1, (zh_title(2), "草稿"), 2))
     assert layout(plan) == ["reuse:1", "new@2", "reuse:2"]
+
+
+# --- Reading progress follows chapters ------------------------------------------------------
+
+
+def test_reading_chapter_shifted_keeps_position():
+    side = ("番外 雪夜", "番外正文。")
+    plan = cm.plan_replace(stored_range(1, 400), incoming(*range(1, 312), side, *range(312, 401)))
+    assert plan.remap_progress(312, 0.4) == (313, 0.4)
+
+
+def test_reading_chapter_deleted_moves_to_preceding_kept_chapter():
+    stored = stored_range(1, 3) + [cm.StoredRef(4, "公告", "x")]
+    plan = cm.plan_replace(stored, incoming(1, 2, 3), delete={4})
+    assert plan.remap_progress(4, 0.7) == (3, 0.0)
+
+
+def test_reading_chapter_kept_keeps_position():
+    stored = stored_range(1, 2) + [cm.StoredRef(3, "公告", "x")]
+    plan = cm.plan_replace(stored, incoming(1, 2, 4))
+    assert plan.remap_progress(3, 0.5) == (3, 0.5)
+
+
+def test_reading_chapter_changed_moves_to_previous_intact_chapter():
+    plan = cm.plan_replace(stored_range(1, 3), incoming(1, (zh_title(2), "新的"), 3))
+    assert plan.remap_progress(2, 0.6) == (1, 0.0)
+
+
+def test_reading_first_chapter_changed_goes_to_chapter_one():
+    plan = cm.plan_replace(stored_range(1, 2), incoming((zh_title(1), "新的"), 2))
+    assert plan.remap_progress(1, 0.6) == (1, 0.0)
+
+
+def test_reading_deleted_with_nothing_before_goes_to_chapter_one():
+    stored = [cm.StoredRef(1, "公告", "x"), *[cm.StoredRef(n + 1, zh_title(n), f"正文{n}。")
+                                             for n in (1, 2)]]
+    plan = cm.plan_replace(stored, incoming(1, 2), delete={1})
+    assert plan.remap_progress(1, 0.3) == (1, 0.0)
+
+
+# --- Hiệu năng --------------------------------------------------------------------------------
+
+
+def test_replace_2000_chapters_of_20kb_is_fast():
+    import time
+
+    def big(n: int) -> str:
+        return (f"第{n}章的正文。" * 2500)[:20_000]
+
+    stored = [cm.StoredRef(n, zh_title(n), big(n)) for n in range(1, 2001)]
+    inc = [cm.Incoming(n, zh_title(n), big(n) if n % 50 else big(n) + "改") for n in range(1, 2011)]
+    t0 = time.perf_counter()
+    plan = cm.plan_replace(stored, inc)
+    elapsed = time.perf_counter() - t0
+    assert plan.count(cm.EntryKind.REUSE) == 1960 and plan.count(cm.EntryKind.CHANGED) == 40
+    assert elapsed < 2.0, elapsed

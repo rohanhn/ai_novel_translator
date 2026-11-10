@@ -8,7 +8,7 @@
   - chèn chương giữa, xóa chương, đổi chỗ hai chương;
   - trùng tiêu đề ở hai quyển, trùng nội dung (hai chương "请假条");
   - chương `kept` ở đầu, chương `kept` liền nhau.
-- [ ] 1.4 Thêm `progress` remap. Kiểm tra bằng test theo scenario "Reading chapter shifted", "Reading chapter deleted", chương đang đọc là `changed` (về chương trước, `position = 0`) và không còn chương nào phía trước (về chương 1). Thêm test hiệu năng: 2000 chương, mỗi chương 20 KB, `plan_replace` dưới 2 giây.
+- [x] 1.4 Thêm `progress` remap. Kiểm tra bằng test theo scenario "Reading chapter shifted", "Reading chapter deleted", chương đang đọc là `changed` (về chương trước, `position = 0`) và không còn chương nào phía trước (về chương 1). Thêm test hiệu năng: 2000 chương, mỗi chương 20 KB, `plan_replace` dưới 2 giây.
 
 ## 2. Storage và job
 
