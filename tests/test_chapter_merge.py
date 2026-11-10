@@ -345,3 +345,25 @@ def test_replace_2000_chapters_of_20kb_is_fast():
     elapsed = time.perf_counter() - t0
     assert plan.count(cm.EntryKind.REUSE) == 1960 and plan.count(cm.EntryKind.CHANGED) == 40
     assert elapsed < 2.0, elapsed
+
+
+# --- Chương có thân giống nhau, chỉ khác tiêu đề -----------------------------------------------
+
+
+def _same_body(numbers, body="相同的正文。") -> list[cm.StoredRef]:
+    return [cm.StoredRef(n, zh_title(n), body) for n in numbers]
+
+
+def test_append_identical_bodies_anchor_by_content_and_title():
+    stored = _same_body(range(1, 4))
+    file = incoming(*[(zh_title(n), "相同的正文。") for n in range(1, 6)])
+    plan = cm.plan_append(stored, file)
+    assert plan.anchor == cm.Anchor(3, 3, "content", zh_title(3))
+    assert positions(plan.to_add) == [4, 5]
+
+
+def test_replace_identical_bodies_reordered_match_by_title():
+    stored = _same_body(range(1, 4))
+    file = incoming(*[(zh_title(n), "相同的正文。") for n in (3, 1, 2)])
+    plan = cm.plan_replace(stored, file)
+    assert layout(plan) == ["reuse:3", "reuse:1", "reuse:2"]

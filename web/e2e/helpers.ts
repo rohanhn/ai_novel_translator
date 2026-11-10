@@ -37,11 +37,33 @@ export async function shot(page: Page, info: TestInfo, name: string) {
 const H = { 'X-Requested-With': 'e2e' };
 
 /** Tạo truyện riêng cho một test (tách dữ liệu giữa các test/project). */
-export async function uploadNovel(page: Page, name: string, chapters: number, paragraphs = 8): Promise<number> {
+/** Văn bản truyện mẫu: chương `numbers`; chương trong `revised` có thêm câu. `unique`: thân
+ * mỗi chương khác nhau (như truyện thật), cần cho so khớp khi cập nhật chương. */
+export function novelText(
+	numbers: number[],
+	paragraphs = 8,
+	revised: number[] = [],
+	unique = false
+): string {
 	const para = '林动站在山上，看着远方的青阳镇，心中暗暗发誓一定要变强。';
-	const text = Array.from({ length: chapters }, (_, i) =>
-		`第${i + 1}章 标题${i + 1}\n` + Array.from({ length: paragraphs }, (_, k) => `${k + 1}. ${para}`).join('\n')
-	).join('\n');
+	return numbers
+		.map(
+			(n) =>
+				`第${n}章 标题${n}\n` +
+				Array.from({ length: paragraphs }, (_, k) => `${k + 1}. ${unique ? `第${n}章。` : ''}${para}`).join('\n') +
+				(revised.includes(n) ? '\n作者修改了这一章。' : '')
+		)
+		.join('\n');
+}
+
+export async function uploadNovel(
+	page: Page,
+	name: string,
+	chapters: number,
+	paragraphs = 8,
+	unique = false
+): Promise<number> {
+	const text = novelText(Array.from({ length: chapters }, (_, i) => i + 1), paragraphs, [], unique);
 	const r = await page.request.post('/api/novels', {
 		headers: H,
 		multipart: { file: { name: `${name}.txt`, mimeType: 'text/plain', buffer: Buffer.from(text) } }

@@ -44,7 +44,7 @@
   - 409 revision thì tự xem lại; 409 bận thì hiện thông điệp.
 
   Kiểm tra `npm run check` và `npm run check:contrast` pass.
-- [ ] 5.3 Playwright `web/e2e/chapter-update.spec.ts` (mobile 360px và desktop), chạy với provider `echo`:
+- [x] 5.3 Playwright `web/e2e/chapter-update.spec.ts` (mobile 360px và desktop), chạy với provider `echo`:
   - append: file có chương mới thì mục lục tăng đúng số chương, chương cũ còn bản dịch;
   - replace: một chương sửa và một chương thiếu được tick xóa thì chương sửa thành chưa dịch, chương thiếu biến mất, tiến độ đọc trỏ đúng chương;
   - chưa chọn chế độ thì không xác nhận được; huỷ thì không đổi gì;

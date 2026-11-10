@@ -138,10 +138,17 @@ def _incoming_keys(incoming: list[Incoming], keyer: Keyer) -> _Keys:
 
 def _find_last(stored: StoredRef, incoming: list[Incoming], keys: _Keys,
                keyer: Keyer) -> Anchor | None:
-    for keys_of, key, match in ((keys.content, keyer.content(stored.source_text), "content"),
-                                (keys.title, keyer.title(stored.title), "title")):
+    """Lần xuất hiện cuối của chương đang lưu trong file. Ưu tiên trùng cả nội dung lẫn tiêu đề
+    (chương có thân giống nhau như thông báo), rồi trùng nội dung, rồi trùng tiêu đề."""
+    ck, tk = keyer.content(stored.source_text), keyer.title(stored.title)
+    tiers = (
+        (lambda i: keys.content[i] == ck and keys.title[i] == tk, "content"),
+        (lambda i: keys.content[i] == ck, "content"),
+        (lambda i: keys.title[i] == tk, "title"),
+    )
+    for hit, match in tiers:
         for i in range(len(incoming) - 1, -1, -1):
-            if keys_of[i] == key:
+            if hit(i):
                 return Anchor(stored.index, incoming[i].position, match, stored.title)
     return None
 
@@ -293,7 +300,10 @@ def plan_replace(stored: list[StoredRef], incoming: list[Incoming], delete: set[
     """Danh sách chương mới theo thứ tự file. `delete`: index các chương thiếu sẽ bị xóa."""
     stored = sorted(stored, key=lambda s: s.index)
     keys = _incoming_keys(incoming, keyer)
+    # Ba lượt: trùng cả nội dung + tiêu đề, rồi chỉ nội dung (đều là REUSE), rồi chỉ tiêu đề.
     content_matched: dict[int, StoredRef] = {}
+    _greedy_pass(list(zip(keys.content, keys.title, strict=True)), stored,
+                 lambda s: (keyer.content(s.source_text), keyer.title(s.title)), content_matched)
     _greedy_pass(keys.content, stored, lambda s: keyer.content(s.source_text), content_matched)
     matched = dict(content_matched)
     _greedy_pass(keys.title, stored, lambda s: keyer.title(s.title), matched)

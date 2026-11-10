@@ -42,12 +42,12 @@ Incoming(position, title, body, heading_number)   # chương trong file (từ Sp
 
 **`plan_append(stored, incoming, start=None) -> AppendPlan`:**
 1. `start` do người dùng chọn thì dùng luôn.
-2. Không có `start`: với `k` từ chương cuối lùi tối đa 5 chương, tìm **lần xuất hiện cuối** trong file của `stored[k]`, khớp nội dung trước rồi tới khớp tiêu đề. Thấy thì điểm nối là vị trí đó.
+2. Không có `start`: với `k` từ chương cuối lùi tối đa 5 chương, tìm **lần xuất hiện cuối** trong file của `stored[k]`. Thứ tự ưu tiên: trùng cả nội dung lẫn tiêu đề, rồi trùng nội dung, rồi trùng tiêu đề. Thấy thì điểm nối là vị trí đó. Mức đầu giúp các chương có thân giống hệt nhau (thông báo, dữ liệu mẫu) không neo nhầm vào lần xuất hiện cuối của một chương khác.
 3. Không thấy neo: xét `heading_number` của chương có số đầu tiên trong file, so với số của chương cuối đang lưu (đọc từ `title_key`). Bằng số cuối + 1 thì nối từ đầu file. Lớn hơn thì cũng nối từ đầu file, kèm cảnh báo `gap` có danh sách số bị thiếu. Còn lại thì trả `needs_start`.
 4. Trả về: `anchor` (index đang lưu, vị trí trong file, loại khớp, hoặc `None`), `to_add` (danh sách vị trí trong file), `warnings`, và `differing` (các chương trước neo chỉ khớp tiêu đề, để hiện thông báo gợi ý dùng tải lại).
 
 **`plan_replace(stored, incoming, delete: set[int]) -> ReplacePlan`:**
-1. **Lượt 1 (khớp nội dung):** map `content_key → [stored index]`. Duyệt file theo thứ tự, lấy chương lưu chưa dùng nhỏ nhất **lớn hơn chương lưu vừa khớp trước đó**. Không có thì lấy chương chưa dùng nhỏ nhất. Cách này giữ đúng thứ tự khi có chương trùng nội dung, ví dụ hai chương "请假条".
+1. **Lượt 1 (khớp nội dung):** trước hết ghép theo cặp (nội dung, tiêu đề), sau đó mới ghép theo riêng nội dung. Map `content_key → [stored index]`. Duyệt file theo thứ tự, lấy chương lưu chưa dùng nhỏ nhất **lớn hơn chương lưu vừa khớp trước đó**. Không có thì lấy chương chưa dùng nhỏ nhất. Cách này giữ đúng thứ tự khi có chương trùng nội dung, ví dụ hai chương "请假条".
 2. **Lượt 2 (khớp tiêu đề):** làm như lượt 1 cho các chương còn lại, theo `title_key`. Tiêu đề `第一章` trùng ở hai quyển nhờ vậy vẫn ghép đúng thứ tự.
 3. Mỗi chương trong file thành một mục:
    - `reuse(old)` khi khớp nội dung,
