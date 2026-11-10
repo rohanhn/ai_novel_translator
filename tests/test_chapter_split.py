@@ -188,3 +188,146 @@ def test_detect_uses_only_leading_sample():
     from novel_translator.domain.chapter_split import LANG_SAMPLE_CHARS, detect_language
     text = "林" * LANG_SAMPLE_CHARS + "Trần Bình An đã rời giường. " * 50_000
     assert detect_language(text) == "zh"
+
+
+# --- plan()/apply() --------------------------------------------------------------------------
+
+def _plan(text):
+    from novel_translator.domain.chapter_split import plan
+    return plan(text)
+
+
+def _titles(p):
+    return [c.title for c in p.chapters]
+
+
+def test_plan_chinese_produces_chapters_in_order():
+    p = _plan("第一章 少年\n正文一。\n第2章 修炼\n正文二。\n第１０章 突破\n正文三。")
+    assert _titles(p) == ["第一章 少年", "第2章 修炼", "第１０章 突破"]
+    assert [c.number for c in p.chapters] == [1, 2, 3]
+    assert [c.heading_number for c in p.chapters] == [1, 2, 10]
+    assert [c.body for c in p.chapters] == ["正文一。", "正文二。", "正文三。"]
+    assert p.front_matter is None and p.warnings == []
+
+
+def test_plan_special_then_chapter():
+    p = _plan("楔子\n很久以前。\n第一章 开始\n正文。")
+    assert _titles(p) == ["楔子", "第一章 开始"]
+    assert p.chapters[0].kind is S
+
+
+def test_plan_vietnamese_chapter_end_notes():
+    lines = [
+        "Chương 1: Rồng ngẩng đầu",
+        "Ngày mùng hai tháng hai, dân gian gọi là “rồng ngẩng đầu”.",
+        "",
+        "(3) Vỡ vỡ bình an: câu nói thường dùng khi lỡ tay làm rơi vỡ đồ vật.",
+        "",
+        "Chương 2: Mở cửa",
+        "",
+        "Trời vừa tảng sáng, gà còn chưa gáy thì Trần Bình An đã rời giường.",
+    ]
+    p = _plan("\n".join(lines))
+    assert _titles(p) == ["Chương 1: Rồng ngẩng đầu", "Chương 2: Mở cửa"]
+    assert p.chapters[0].body.endswith("(3) Vỡ vỡ bình an: câu nói thường dùng khi lỡ tay làm rơi vỡ đồ vật.")
+    assert p.chapters[1].body.startswith("Trời vừa tảng sáng")
+
+
+# --- Requirement: Volume headings ------------------------------------------------------------
+
+def test_volume_above_chapters():
+    p = _plan("Quyển 1: Kiếm khí\nChương 1: Rồng ngẩng đầu\nThân chương.\nChương 2: Mở cửa\nB.")
+    assert _titles(p) == ["Quyển 1: Kiếm khí · Chương 1: Rồng ngẩng đầu", "Chương 2: Mở cửa"]
+    assert p.front_matter is None
+    assert all("Quyển" not in c.body for c in p.chapters)
+
+
+def test_volume_between_chapters_not_in_body():
+    p = _plan("第一章 甲\n正文一。\n第二卷 风云\n第二章 乙\n正文二。")
+    assert _titles(p) == ["第一章 甲", "第二卷 风云 · 第二章 乙"]
+    assert p.chapters[0].body == "正文一。"
+
+
+def test_volumes_only():
+    p = _plan("第一卷\n正文一。\n第二卷\n正文二。")
+    assert _titles(p) == ["第一卷", "第二卷"]
+    assert [c.kind for c in p.chapters] == [V, V]
+
+
+# --- Requirement: Front matter before the first heading --------------------------------------
+
+def test_short_book_header_discarded_by_default():
+    p = _plan("Kiếm Lai\nTác giả: Phong Hỏa Hí Chư Hầu\n\nChương 1: Rồng ngẩng đầu\nThân.")
+    assert p.front_matter is not None and p.front_matter.keep is False
+    assert p.front_matter.text == "Kiếm Lai\nTác giả: Phong Hỏa Hí Chư Hầu"
+    assert _titles(p) == ["Chương 1: Rồng ngẩng đầu"]
+
+
+def test_long_prologue_kept_by_default():
+    prologue = "Trời đất mờ mịt, núi sông lặng im. " * 45  # ~1.500 ký tự
+    p = _plan(prologue + "\nChương 1: Bắt đầu\nThân.")
+    assert p.front_matter.keep is True
+    assert _titles(p) == ["Mở đầu", "Chương 1: Bắt đầu"]
+    assert p.chapters[0].body == prologue.strip()
+    assert [c.number for c in p.chapters] == [1, 2]
+
+
+def test_front_matter_override():
+    from novel_translator.domain.chapter_split import apply
+    text = "Kiếm Lai\nChương 1: A\nThân."
+    assert _titles(apply(text, [1], keep_front_matter=True)) == ["Mở đầu", "Chương 1: A"]
+    long = "x" * 300 + "\nChương 1: A\nThân."
+    assert _titles(apply(long, [1], keep_front_matter=False)) == ["Chương 1: A"]
+
+
+# --- Requirement: Fallback when no heading is found ------------------------------------------
+
+def test_fallback_single_chapter_with_warning():
+    p = _plan("Một đoạn văn không có tiêu đề.\nĐoạn thứ hai.")
+    assert _titles(p) == ["Chương 1"]
+    assert p.chapters[0].body == "Một đoạn văn không có tiêu đề.\nĐoạn thứ hai."
+    assert [w.code for w in p.warnings] == ["no_headings"]
+
+
+def test_empty_text_has_no_chapters():
+    p = _plan("  \n\n ")
+    assert p.chapters == [] and p.warnings == []
+
+
+# --- Requirement: Adjustable split -----------------------------------------------------------
+
+def _numbered(n):
+    """Văn bản n dòng; dòng 1, 40, 90 là tiêu đề."""
+    lines = [f"dòng {i}" for i in range(n)]
+    lines[1], lines[40], lines[90] = "Chương 1: A", "Chương 2: B", "Chương 3: C"
+    return "\n".join(lines)
+
+
+def test_merge_by_removing_heading():
+    from novel_translator.domain.chapter_split import apply
+    text = _numbered(120)
+    assert _plan(text).boundaries == [1, 40, 90]
+    p = apply(text, [1, 90])
+    assert _titles(p) == ["Chương 1: A", "Chương 3: C"]
+    assert "Chương 2: B\ndòng 41" in p.chapters[0].body
+
+
+def test_split_at_arbitrary_line():
+    from novel_translator.domain.chapter_split import apply
+    p = apply(_numbered(120), [1, 40, 60, 90])
+    assert _titles(p) == ["Chương 1: A", "Chương 2: B", "dòng 60", "Chương 3: C"]
+    assert p.chapters[2].kind is None and p.chapters[2].heading_number is None
+    assert p.chapters[1].end_line == 60 and p.chapters[2].body.startswith("dòng 61")
+
+
+@pytest.mark.parametrize("bad", [[500], [-1], [0, 2]])
+def test_apply_rejects_invalid_boundaries(bad):
+    from novel_translator.domain.chapter_split import apply
+    with pytest.raises(ValueError):
+        apply("Chương 1: A\nthân\n\nChương 2: B", bad)
+
+
+def test_apply_dedupes_and_sorts():
+    from novel_translator.domain.chapter_split import apply
+    p = apply(_numbered(100), [90, 1, 40, 40])
+    assert p.boundaries == [1, 40, 90]

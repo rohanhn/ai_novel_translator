@@ -219,3 +219,138 @@ def detect_language(text: str) -> str:
     if letters and han / letters >= ZH_HAN_RATIO:
         return "zh"
     return "vi" if vi else "unknown"
+
+
+# --- Kế hoạch tách ---------------------------------------------------------------------------
+
+FRONT_MATTER_KEEP_CHARS = 200
+FRONT_MATTER_TITLE = "Mở đầu"
+FALLBACK_TITLE = "Chương 1"
+
+
+@dataclass
+class SplitWarning:
+    code: str
+    message: str
+    params: dict
+
+
+@dataclass
+class SplitChapter:
+    number: int  # thứ tự 1..n trong kết quả
+    start_line: int
+    end_line: int  # không bao gồm
+    title: str
+    body: str
+    kind: HeadingKind | None  # None: phần mở đầu, fallback, hoặc ranh giới người dùng thêm
+    heading_number: int | None  # số đọc được từ tiêu đề (để kiểm tra dãy số)
+    warnings: list[SplitWarning]
+
+    @property
+    def chars(self) -> int:
+        return len(self.body)
+
+
+@dataclass
+class FrontMatter:
+    start_line: int
+    end_line: int
+    text: str
+    keep: bool
+
+    @property
+    def chars(self) -> int:
+        return len(self.text)
+
+
+@dataclass
+class SplitPlan:
+    line_count: int
+    boundaries: list[int]
+    front_matter: FrontMatter | None
+    chapters: list[SplitChapter]
+    warnings: list[SplitWarning]  # cấp file
+
+
+def _join(lines: list[str]) -> str:
+    return "\n".join(lines).strip()
+
+
+def default_boundaries(lines: list[str]) -> list[int]:
+    """Ranh giới mặc định: dòng tiêu đề chương/đặc biệt; chỉ dùng quyển khi không có chúng."""
+    headings = find_headings(lines)
+    chapter_like = [h.line for h in headings if h.kind is not HeadingKind.VOLUME]
+    if chapter_like:
+        return chapter_like
+    return [h.line for h in headings]
+
+
+def plan(text: str) -> SplitPlan:
+    """Kết quả tách mặc định của một file."""
+    lines = split_lines(text)
+    return _build(lines, default_boundaries(lines), None)
+
+
+def apply(text: str, boundaries: list[int], keep_front_matter: bool | None = None) -> SplitPlan:
+    """Dựng lại chương từ một tập ranh giới bất kỳ (số dòng). `keep_front_matter=None` dùng
+    lựa chọn mặc định (giữ khi phần mở đầu ≥200 ký tự)."""
+    lines = split_lines(text)
+    cleaned = sorted(set(boundaries))
+    for b in cleaned:
+        if not 0 <= b < len(lines):
+            raise ValueError(f"Ranh giới dòng {b} nằm ngoài file ({len(lines)} dòng).")
+        if not lines[b].strip():
+            raise ValueError(f"Dòng {b} trống, không thể làm tiêu đề chương.")
+    return _build(lines, cleaned, keep_front_matter)
+
+
+def _build(lines: list[str], boundaries: list[int], keep_front: bool | None) -> SplitPlan:
+    warnings: list[SplitWarning] = []
+    if not boundaries:
+        body = _join(lines)
+        chapters = [SplitChapter(1, 0, len(lines), FALLBACK_TITLE, body, None, None, [])]
+        if body:
+            warnings.append(SplitWarning(
+                "no_headings", "Không tìm thấy tiêu đề chương nào; cả file là một chương.", {}))
+        return SplitPlan(len(lines), [], None, chapters if body else [], warnings)
+
+    headings = {h.line: h for h in find_headings(lines)}
+    has_chapter_headings = any(h.kind is not HeadingKind.VOLUME for h in headings.values())
+    boundary_set = set(boundaries)
+    # Dòng quyển không phải ranh giới → ghép vào tiêu đề chương kế, không nằm trong thân chương.
+    volume_lines = {
+        ln for ln, h in headings.items()
+        if h.kind is HeadingKind.VOLUME and has_chapter_headings and ln not in boundary_set
+    }
+
+    def body_of(start: int, end: int) -> str:
+        return _join([lines[i] for i in range(start, end) if i not in volume_lines])
+
+    def volumes_in(start: int, end: int) -> list[str]:
+        return [headings[i].text for i in range(start, end) if i in volume_lines]
+
+    front = None
+    front_text = body_of(0, boundaries[0])
+    if front_text:
+        first = next(i for i in range(boundaries[0]) if lines[i].strip() and i not in volume_lines)
+        keep = len(front_text) >= FRONT_MATTER_KEEP_CHARS if keep_front is None else keep_front
+        front = FrontMatter(first, boundaries[0], front_text, keep)
+
+    chapters: list[SplitChapter] = []
+    if front and front.keep:
+        chapters.append(SplitChapter(1, front.start_line, front.end_line, FRONT_MATTER_TITLE,
+                                     front.text, None, None, []))
+    prev_end = 0
+    for i, start in enumerate(boundaries):
+        end = boundaries[i + 1] if i + 1 < len(boundaries) else len(lines)
+        title = unicodedata.normalize("NFC", lines[start].strip())
+        prefix = volumes_in(prev_end, start)
+        if prefix:
+            title = " · ".join([*prefix, title])
+        h = headings.get(start)
+        chapters.append(SplitChapter(
+            len(chapters) + 1, start, end, title, body_of(start + 1, end),
+            h.kind if h else None, h.number if h else None, [],
+        ))
+        prev_end = start + 1
+    return SplitPlan(len(lines), boundaries, front, chapters, warnings)
