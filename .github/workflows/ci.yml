@@ -1,0 +1,103 @@
+# CI/CD (spec release-pipeline; design D1). Mô hình "CI build, VPS chỉ chạy":
+#   checks: lint + test (Postgres 16 service, provider echo, không cần key LLM)
+#   image:  build một lần → quét Trivy → push đúng image đó lên GHCR (chỉ main / tag vX.Y.Z)
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # PR mới đẩy thêm commit thì huỷ lần chạy cũ; main và tag luôn chạy hết.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nt
+          POSTGRES_PASSWORD: nt-ci-only
+          POSTGRES_DB: nt_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U nt -d nt_test"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      # Database chỉ sống trong job; tên kết thúc `_test` theo yêu cầu của conftest/e2e.
+      NT_TEST_DATABASE_URL: postgresql://nt:nt-ci-only@localhost:5432/nt_test
+      E2E_DATABASE_URL: postgresql://nt:nt-ci-only@localhost:5432/nt_e2e_test
+      PGPASSWORD: nt-ci-only
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Database riêng cho Playwright (e2e xoá schema, không dùng chung với pytest)
+        run: psql -h localhost -U nt -d nt_test -c "CREATE DATABASE nt_e2e_test"
+
+      # ---- Python: .venv ở gốc repo (Playwright gọi .venv/bin/python web/e2e/server.py)
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+      - name: Cài app (dev + mọi provider)
+        run: |
+          uv venv .venv --python 3.14
+          uv pip install --python .venv/bin/python -e ".[dev,all]"
+      - name: Ruff
+        run: .venv/bin/ruff check src tests
+      - name: Pytest (provider echo, không gọi LLM thật)
+        run: .venv/bin/pytest -q
+
+      # ---- Shell scripts
+      - name: Shellcheck
+        run: shellcheck deploy/*.sh docker/*.sh
+
+      # ---- Web
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: npm ci
+        working-directory: web
+        run: npm ci --no-audit --no-fund
+      - name: svelte-check
+        working-directory: web
+        run: npm run check
+      - name: Contrast
+        working-directory: web
+        run: npm run check:contrast
+      - name: Web build
+        working-directory: web
+        run: npm run build
+
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}
+      - name: Cài Chromium cho Playwright
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Playwright (e2e)
+        working-directory: web
+        env:
+          NT_TEST_DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
+        run: npm run test:e2e
+      - name: Báo cáo Playwright khi lỗi
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: web/test-results
+          retention-days: 7
+          if-no-files-found: ignore

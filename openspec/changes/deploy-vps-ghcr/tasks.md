@@ -30,7 +30,7 @@
 
 ## 4. CI/CD
 
-- [ ] 4.1 Viết `.github/workflows/ci.yml`, job `checks` (D1):
+- [x] 4.1 Viết `.github/workflows/ci.yml`, job `checks` (D1):
   - Postgres 16 service, tạo database `nt_test` và `nt_e2e_test`;
   - `uv venv .venv && uv pip install -e ".[dev,all]"` ở gốc repo (Playwright gọi `.venv/bin/python`), rồi ruff, pytest;
   - npm ci, check, check:contrast, build, Playwright chromium dùng DB e2e;
