@@ -26,12 +26,12 @@ H = {"X-Requested-With": "test"}
 
 @pytest.fixture
 def client_for(db, password_hash):
-    def _make(**settings):
+    def _make(peer: str = "testclient", **settings):
         settings.setdefault("password_hash", password_hash)
         settings.setdefault("cookie_secure", False)
         c = build_container(Settings(_env_file=None, provider="echo", **settings), pool=db)
         app.dependency_overrides[get_container] = lambda: c
-        return TestClient(app, headers=H), c
+        return TestClient(app, headers=H, client=(peer, 50000)), c
 
     yield _make
     app.dependency_overrides.clear()
@@ -165,8 +165,13 @@ def test_failures_outside_window_not_counted():
     svc.login("dung", "ip")  # không bị khóa
 
 
+def _fail_logins(client, xff: str, n: int = 5) -> None:
+    for _ in range(n):
+        client.post("/api/auth/login", json={"password": "x"}, headers={"X-Forwarded-For": xff})
+
+
 def test_x_forwarded_for_only_from_trusted_proxy(client_for):
-    client, _ = client_for(trusted_proxy="testclient")
+    client, _ = client_for(peer="172.18.0.5", trusted_proxy="172.18.0.5")
     for _ in range(5):
         client.post("/api/auth/login", json={"password": "x"},
                     headers={"X-Forwarded-For": "203.0.113.7"})
@@ -186,6 +191,69 @@ def test_spoofed_x_forwarded_for_ignored_without_trusted_proxy(client_for):
     r = client.post("/api/auth/login", json={"password": TEST_PASSWORD},
                     headers={"X-Forwarded-For": "10.0.0.99"})
     assert r.status_code == 429  # cùng IP kết nối thật → vẫn bị khóa
+
+
+def test_proxy_inside_trusted_range(client_for):
+    """Spec "Proxy inside a trusted range": đếm theo IP trong X-Forwarded-For."""
+    client, _ = client_for(peer="172.18.0.5", trusted_proxy="172.18.0.0/16")
+    _fail_logins(client, "203.0.113.7")
+    r = client.post("/api/auth/login", json={"password": TEST_PASSWORD},
+                    headers={"X-Forwarded-For": "203.0.113.7"})
+    assert r.status_code == 429
+    r = client.post("/api/auth/login", json={"password": TEST_PASSWORD},
+                    headers={"X-Forwarded-For": "203.0.113.8"})
+    assert r.status_code == 204
+
+
+def test_untrusted_sender_spoofing_header_counted_by_peer(client_for):
+    """Spec "Untrusted sender spoofs the header": đếm theo IP kết nối thật."""
+    client, _ = client_for(peer="198.51.100.9", trusted_proxy="172.18.0.0/16")
+    for i in range(5):
+        _fail_logins(client, f"203.0.113.{i}", n=1)
+    r = client.post("/api/auth/login", json={"password": TEST_PASSWORD},
+                    headers={"X-Forwarded-For": "203.0.113.200"})
+    assert r.status_code == 429
+
+
+def test_single_address_and_ipv6_range_together(client_for):
+    """Spec "Single address and range together"."""
+    from fastapi import Request
+
+    from novel_translator.interfaces.api.auth import client_ip
+
+    _, c = client_for(trusted_proxy="10.0.0.2, fd00::/8")
+    nets = c.settings.trusted_proxy_networks
+
+    def req(peer: str) -> Request:
+        return Request({"type": "http", "client": (peer, 1), "headers": [
+            (b"x-forwarded-for", b"203.0.113.7")]})
+
+    assert client_ip(req("10.0.0.2"), nets) == "203.0.113.7"
+    assert client_ip(req("fd00::5"), nets) == "203.0.113.7"
+    assert client_ip(req("10.0.0.3"), nets) == "10.0.0.3"
+    assert client_ip(req("unknown"), nets) == "unknown"
+
+
+def test_last_forwarded_address_must_be_ip(client_for):
+    from fastapi import Request
+
+    from novel_translator.interfaces.api.auth import client_ip
+
+    _, c = client_for(trusted_proxy="10.0.0.2")
+    r = Request({"type": "http", "client": ("10.0.0.2", 1),
+                 "headers": [(b"x-forwarded-for", b"garbage")]})
+    assert client_ip(r, c.settings.trusted_proxy_networks) == "10.0.0.2"
+
+
+@pytest.mark.parametrize("bad", ["172.18.0.0/99", "testclient", "10.0.0.1, 300.1.1.1"])
+def test_invalid_trusted_proxy_refuses_to_start(bad):
+    """Spec "Invalid setting": Settings lỗi (nên app không khởi động), nêu đúng mục sai."""
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError) as e:
+        Settings(_env_file=None, trusted_proxy=bad)
+    wrong = bad.split(",")[-1].strip()
+    assert f"'{wrong}'" in str(e.value)
 
 
 def test_mutating_request_requires_csrf_header(api_client):

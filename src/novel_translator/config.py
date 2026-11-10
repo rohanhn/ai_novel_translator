@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import ipaddress
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_CHAIN = "gemini:gemini-3.5-flash,gemini:gemini-3.5-flash-lite"
@@ -13,6 +15,26 @@ DEFAULT_CHAIN = "gemini:gemini-3.5-flash,gemini:gemini-3.5-flash-lite"
 class ChainStep:
     provider: str
     model: str
+
+
+IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
+
+
+def parse_networks(spec: str | None) -> list[IPNetwork]:
+    """'10.0.0.2, 172.18.0.0/16, fd00::/8' → danh sách network (IP đơn = /32 hoặc /128)."""
+    nets: list[IPNetwork] = []
+    for raw in (spec or "").split(","):
+        entry = raw.strip()
+        if not entry:
+            continue
+        try:
+            nets.append(ipaddress.ip_network(entry, strict=False))
+        except ValueError:
+            raise ValueError(
+                f"NT_TRUSTED_PROXY có mục không hợp lệ: '{entry}' (cần IP hoặc CIDR, "
+                "vd. 172.18.0.5 hoặc 172.18.0.0/16)."
+            ) from None
+    return nets
 
 
 def parse_chain(spec: str) -> list[ChainStep]:
@@ -49,7 +71,8 @@ class Settings(BaseSettings):
 
     # Đăng nhập: hash argon2 (tạo bằng `novel hash-password`), không bao giờ là mật khẩu gốc.
     password_hash: SecretStr | None = None
-    # IP (phân tách bằng dấu phẩy) của reverse proxy được tin để đọc X-Forwarded-For.
+    # IP hoặc CIDR (phân tách bằng dấu phẩy) của reverse proxy được tin để đọc X-Forwarded-For.
+    # Mục sai → Settings() lỗi → app không khởi động (spec "Trusted proxy configuration").
     trusted_proxy: str | None = None
     # Cookie Secure (bắt buộc với HTTPS); chỉ tắt khi chạy thử qua http://localhost.
     cookie_secure: bool = True
@@ -71,6 +94,16 @@ class Settings(BaseSettings):
 
     openai_base_url: str | None = None
     ollama_base_url: str = "http://localhost:11434/v1"
+
+    @field_validator("trusted_proxy")
+    @classmethod
+    def _check_trusted_proxy(cls, v: str | None) -> str | None:
+        parse_networks(v)
+        return v
+
+    @cached_property
+    def trusted_proxy_networks(self) -> list[IPNetwork]:
+        return parse_networks(self.trusted_proxy)
 
     def chain_steps(self) -> list[ChainStep]:
         return parse_chain(self.chain)

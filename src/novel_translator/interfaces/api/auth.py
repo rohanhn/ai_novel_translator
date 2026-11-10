@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import ipaddress
 import math
+from collections.abc import Sequence
 
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from ...application.auth import SESSION_IDLE, InvalidCredentialsError, LoginLockedError
+from ...config import IPNetwork
 from ...container import Container, get_container
 
 COOKIE = "nt_session"
@@ -33,17 +35,24 @@ def is_public(path: str) -> bool:
     return path in PUBLIC_PATHS or is_web_path(path)
 
 
-def client_ip(request: Request, trusted_proxy: str | None) -> str:
-    """IP thật của client. Chỉ tin X-Forwarded-For khi kết nối đến từ proxy tin cậy; lấy địa
-    chỉ cuối cùng (do proxy tin cậy ghi vào)."""
+def client_ip(request: Request, trusted: Sequence[IPNetwork]) -> str:
+    """IP thật của client. Chỉ tin X-Forwarded-For khi kết nối đến từ proxy tin cậy (IP hoặc
+    dải CIDR); lấy địa chỉ cuối cùng (do proxy tin cậy ghi vào)."""
     peer = request.client.host if request.client else "unknown"
-    trusted = {p.strip() for p in (trusted_proxy or "").split(",") if p.strip()}
-    if peer in trusted:
+    if _in_networks(peer, trusted):
         hops = [h.strip() for h in request.headers.get("x-forwarded-for", "").split(",")]
         hops = [h for h in hops if _is_ip(h)]
         if hops:
             return hops[-1]
     return peer
+
+
+def _in_networks(value: str, nets: Sequence[IPNetwork]) -> bool:
+    try:
+        addr = ipaddress.ip_address(value)
+    except ValueError:
+        return False  # peer không phải IP (vd. "unknown") thì không tin
+    return any(addr in net for net in nets)
 
 
 def _is_ip(value: str) -> bool:
@@ -71,7 +80,7 @@ class LoginIn(BaseModel):
 @router.post("/login", status_code=204)
 def login(body: LoginIn, request: Request, response: Response):
     c = container_of(request)
-    ip = client_ip(request, c.settings.trusted_proxy)
+    ip = client_ip(request, c.settings.trusted_proxy_networks)
     try:
         token = c.auth.login(body.password, ip)
     except LoginLockedError as e:
