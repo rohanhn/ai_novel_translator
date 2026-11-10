@@ -132,3 +132,42 @@ def test_import_invalid_lang_and_empty_file(use, tmp_path):
     r = runner.invoke(cli.app, ["import", str(p)])
     assert r.exit_code == 1
     assert c.library.list_novels() == []
+
+
+# --- edit-novel-details 3.2: novel edit ---------------------------------------------------
+
+def test_edit_author_keeps_title_and_list_shows_author(use, sample_txt):
+    use = use(provider="echo")
+    runner.invoke(cli.app, ["import", str(sample_txt)])
+    nid = use.library.list_novels()[0].id
+    r = runner.invoke(cli.app, ["edit", str(nid), "--author", "Phong Hỏa Hí Chư Hầu"])
+    assert r.exit_code == 0, r.output
+    n = use.library.get_novel(nid)
+    assert (n.title, n.author) == ("sample", "Phong Hỏa Hí Chư Hầu")
+    r = runner.invoke(cli.app, ["list"])
+    assert f"#{nid}\tsample\tPhong Hỏa Hí Chư Hầu\tzh→vi" in r.output
+    # "" xoá tác giả; giới thiệu giữ xuống dòng
+    r = runner.invoke(cli.app, ["edit", str(nid), "--author", "", "--description", "A\nB"])
+    assert r.exit_code == 0, r.output
+    n = use.library.get_novel(nid)
+    assert (n.author, n.description) == (None, "A\nB")
+    assert f"#{nid}\tsample\t-\tzh→vi" in runner.invoke(cli.app, ["list"]).output
+
+
+def test_edit_without_option_fails(use, sample_txt):
+    use = use(provider="echo")
+    runner.invoke(cli.app, ["import", str(sample_txt)])
+    nid = use.library.list_novels()[0].id
+    r = runner.invoke(cli.app, ["edit", str(nid)])
+    assert r.exit_code != 0 and "ít nhất một" in r.output
+
+
+def test_edit_invalid_or_unknown_novel_fails(use, sample_txt):
+    use = use(provider="echo")
+    runner.invoke(cli.app, ["import", str(sample_txt)])
+    nid = use.library.list_novels()[0].id
+    r = runner.invoke(cli.app, ["edit", str(nid), "--title", "   ", "--author", "X"])
+    assert r.exit_code != 0 and "Tên truyện không được để trống" in r.output
+    assert use.library.get_novel(nid).author is None
+    r = runner.invoke(cli.app, ["edit", "999", "--title", "X"])
+    assert r.exit_code != 0 and "Không có truyện" in r.output

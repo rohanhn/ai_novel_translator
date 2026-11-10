@@ -61,9 +61,32 @@ def import_novel(
 
 @app.command("list")
 def list_novels():
-    """Liệt kê các truyện đã nhập."""
+    """Liệt kê các truyện đã nhập (id, tên, tác giả, ngôn ngữ)."""
     for n in _c().library.list_novels():
-        typer.echo(f"#{n.id}\t{n.title}\t{n.source_lang}→{n.target_lang}")
+        typer.echo(f"#{n.id}\t{n.title}\t{n.author or '-'}\t{n.source_lang}→{n.target_lang}")
+
+
+@app.command("edit")
+def edit_novel(
+    novel_id: int,
+    title: str | None = typer.Option(None, "--title", help="Tên truyện mới"),
+    author: str | None = typer.Option(None, "--author", help='Tác giả ("" để xoá)'),
+    description: str | None = typer.Option(
+        None, "--description", help='Giới thiệu ngắn, giữ xuống dòng ("" để xoá)'),
+):
+    """Sửa tên, tác giả, giới thiệu ngắn của truyện. Ảnh bìa: chỉ sửa trên web."""
+    fields = {k: v for k, v in
+              (("title", title), ("author", author), ("description", description))
+              if v is not None}
+    if not fields:
+        _fail("Cần ít nhất một trong --title, --author, --description.")
+    try:
+        n = _c().library.update_details(novel_id, **fields)
+    except (NotFoundError, ValueError) as e:
+        _fail(str(e))
+    typer.echo(f"Đã cập nhật truyện #{n.id}: '{n.title}'"
+               f" · tác giả: {n.author or '-'}"
+               f" · giới thiệu: {len(n.description or '')} ký tự")
 
 
 @app.command("chapters")

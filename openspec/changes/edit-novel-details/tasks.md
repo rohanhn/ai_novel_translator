@@ -16,7 +16,7 @@
 ## 3. API và CLI
 
 - [x] 3.1 API: `PATCH /api/novels/{id}` (`NovelDetailsIn`, `model_fields_set`), `PUT|DELETE|GET /api/novels/{id}/cover` (đọc theo chunk, 10 MB → 413, rỗng → 400, `Cache-Control: private, max-age=31536000, immutable`); `NovelOut`/`LibraryItem` thêm `author`, `description`, `cover_url` (`?v=` theo `cover_updated_at`); `POST /api/covers/fetch` (trả WebP, `Cache-Control: no-store`, không lưu gì); handler `NovelDetailsError`/`InvalidImageError`/`CoverFetchError` → 400 kèm `field` (và `reason`). Kiểm tra: `tests/test_api_novel_details.py` phủ các scenario của "Edit novel details", "Novel details validation", "Novel cover upload", "Cover image processing", "Cover image access", "Cover image from a link" (fetcher giả trong container test; 401 khi chưa đăng nhập, 403 thiếu CSRF header, `X-Robots-Tag` trên ảnh, `cover_url` đổi sau khi thay ảnh, 404 sau khi gỡ, xoá truyện thì 404 ảnh).
-- [ ] 3.2 CLI `novel edit <id> [--title] [--author] [--description]` (không option → thoát mã 1; `""` xoá; lỗi validate/không tìm thấy → thoát mã 1), `novel list` thêm cột tác giả. Kiểm tra: `tests/test_cli.py` (CliRunner) theo 3 scenario của "CLI edit novel details".
+- [x] 3.2 CLI `novel edit <id> [--title] [--author] [--description]` (không option → thoát mã 1; `""` xoá; lỗi validate/không tìm thấy → thoát mã 1), `novel list` thêm cột tác giả. Kiểm tra: `tests/test_cli.py` (CliRunner) theo 3 scenario của "CLI edit novel details".
 
 ## 4. Web
 
