@@ -109,7 +109,9 @@ def build_container(
     jobs = TranslationJobManager(translation, autostart=False)
     prefetch = PrefetchService(repo, jobs, quota)
     loader = TxtLoader()
-    library = LibraryService(repo, loader, on_delete=jobs.cancel_queued_for_novel)
+    cover_processor = PillowCoverProcessor()
+    library = LibraryService(repo, loader, on_delete=jobs.cancel_queued_for_novel,
+                             covers=cover_processor)
     return Container(
         settings=settings,
         library=library,
@@ -130,7 +132,7 @@ def build_container(
         quota=quota,
         provider_factory=provider_factory,
         pool=pool,
-        cover_processor=PillowCoverProcessor(),
+        cover_processor=cover_processor,
     )
 
 

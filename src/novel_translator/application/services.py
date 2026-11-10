@@ -19,7 +19,9 @@ from ..domain.models import (
     ReadingProgress,
     SuggestionStatus,
 )
+from ..domain.novel_details import UNSET, CoverImage, Unset, normalize_details
 from ..domain.ports import (
+    CoverImageProcessor,
     DailyQuotaError,
     Exporter,
     LLMProvider,
@@ -66,10 +68,12 @@ class ImportResult:
 
 class LibraryService:
     def __init__(self, repo: NovelRepository, loader: SourceLoader,
-                 on_delete: Callable[[int], object] | None = None):
+                 on_delete: Callable[[int], object] | None = None,
+                 covers: CoverImageProcessor | None = None):
         self.repo = repo
         self.loader = loader
         self.on_delete = on_delete  # vd. hủy prefetch đang chờ của truyện
+        self.covers = covers  # kiểm tra + chuẩn hoá ảnh bìa (adapter nối trong container)
 
     def overview(self) -> list[NovelSummary]:
         return self.repo.library_overview()
@@ -130,6 +134,55 @@ class LibraryService:
 
     def list_novels(self) -> list[Novel]:
         return self.repo.list_novels()
+
+    # --- thông tin truyện + ảnh bìa (spec novel-library "Edit novel details") ---
+    def update_details(
+        self, novel_id: int, *,
+        title: str | None | Unset = UNSET,
+        author: str | None | Unset = UNSET,
+        description: str | None | Unset = UNSET,
+    ) -> Novel:
+        """Đổi các trường được truyền (bỏ qua `UNSET`); rỗng/`None` ở tác giả, giới thiệu = xoá.
+        Không đụng chương, bản dịch, bộ tên, tiến độ; không gọi LLM."""
+        fields = normalize_details(title=title, author=author, description=description)
+        if not fields:
+            raise ValueError("Cần ít nhất một trường để cập nhật (tên, tác giả hoặc giới thiệu).")
+        self.get_novel(novel_id)
+        novel = self.repo.update_novel_details(novel_id, fields)
+        if novel is None:
+            raise NotFoundError(f"Không có truyện id={novel_id}")
+        return novel
+
+    def _processor(self) -> CoverImageProcessor:
+        if self.covers is None:
+            raise RuntimeError("Chưa cấu hình bộ xử lý ảnh bìa.")
+        return self.covers
+
+    def process_cover(self, data: bytes) -> CoverImage:
+        """Kiểm tra + chuẩn hoá ảnh, không lưu (dùng cho xem trước). Lỗi → `InvalidImageError`."""
+        return self._processor().process(data)
+
+    def set_cover(self, novel_id: int, data: bytes) -> Novel:
+        """Thay ảnh bìa. Ảnh không hợp lệ → `InvalidImageError`, ảnh cũ giữ nguyên."""
+        self.get_novel(novel_id)
+        image = self.process_cover(data)
+        novel = self.repo.set_cover(novel_id, image)
+        if novel is None:
+            raise NotFoundError(f"Không có truyện id={novel_id}")
+        return novel
+
+    def remove_cover(self, novel_id: int) -> Novel:
+        """Gỡ ảnh bìa (idempotent): truyện quay về bìa tự vẽ."""
+        self.get_novel(novel_id)
+        self.repo.delete_cover(novel_id)
+        return self.get_novel(novel_id)
+
+    def get_cover(self, novel_id: int) -> CoverImage:
+        self.get_novel(novel_id)
+        image = self.repo.get_cover(novel_id)
+        if image is None:
+            raise NotFoundError("Truyện này chưa có ảnh bìa.")
+        return image
 
     def list_chapters(self, novel_id: int) -> list[Chapter]:
         self.get_novel(novel_id)

@@ -21,7 +21,7 @@ COVER_URL_MAX: Final = 2000
 DETAIL_FIELDS: Final = ("title", "author", "description")
 
 
-class _Unset:
+class Unset:
     """Giá trị "không gửi" (khác với gửi rỗng = xoá trường). Chỉ dùng instance `UNSET`."""
 
     __slots__ = ()
@@ -33,7 +33,7 @@ class _Unset:
         return False
 
 
-UNSET: Final = _Unset()
+UNSET: Final = Unset()
 
 
 class NovelDetailsError(ValueError):
@@ -82,9 +82,9 @@ def _multi_line(value: str) -> str:
 
 def normalize_details(
     *,
-    title: str | None | _Unset = UNSET,
-    author: str | None | _Unset = UNSET,
-    description: str | None | _Unset = UNSET,
+    title: str | None | Unset = UNSET,
+    author: str | None | Unset = UNSET,
+    description: str | None | Unset = UNSET,
 ) -> dict[str, str | None]:
     """Chuẩn hoá các trường được gửi (bỏ qua `UNSET`) và kiểm tra giới hạn.
 
@@ -95,19 +95,19 @@ def normalize_details(
     Độ dài đếm theo ký tự Unicode sau NFC và trim. Lỗi → `NovelDetailsError(field, message)`.
     """
     out: dict[str, str | None] = {}
-    if not isinstance(title, _Unset):
+    if not isinstance(title, Unset):
         t = _one_line(title or "")
         if not t:
             raise NovelDetailsError("title", "Tên truyện không được để trống.")
         if len(t) > TITLE_MAX:
             raise NovelDetailsError("title", f"Tên truyện tối đa {TITLE_MAX} ký tự.")
         out["title"] = t
-    if not isinstance(author, _Unset):
+    if not isinstance(author, Unset):
         a = _one_line(author or "")
         if len(a) > AUTHOR_MAX:
             raise NovelDetailsError("author", f"Tên tác giả tối đa {AUTHOR_MAX} ký tự.")
         out["author"] = a or None
-    if not isinstance(description, _Unset):
+    if not isinstance(description, Unset):
         d = _multi_line(description or "")
         if len(d) > DESCRIPTION_MAX:
             raise NovelDetailsError(
