@@ -30,8 +30,9 @@ from .media.pillow_cover import PillowCoverProcessor
 from .providers import create_provider
 from .providers.chain import ChainLink, ChainProvider
 from .security import verify_password
+from .storage import migrator
 from .storage.db import DatabaseConfigError, create_pool, ping
-from .storage.migrator import migrate
+from .storage.migrator import MigrationError, migrate
 from .storage.postgres_repo import PostgresRepository
 from .storage.quota_repo import PostgresQuotaTracker
 
@@ -65,7 +66,21 @@ class Container:
         self.pool.close()
 
 
-__all__ = ["Container", "DatabaseConfigError", "build_container", "get_container"]
+__all__ = ["Container", "DatabaseConfigError", "MigrationError", "build_container",
+           "get_container", "run_migrations"]
+
+
+def run_migrations(settings: Settings | None = None) -> tuple[list[int], int]:
+    """Chỉ áp dụng migration còn thiếu (entrypoint của image, `novel migrate`), không dựng
+    provider hay auth nên không cần key LLM hay mật khẩu. Trả (version vừa áp dụng, version
+    hiện tại). Lỗi: DatabaseConfigError / MigrationError (thông báo có tên file)."""
+    settings = settings or Settings()
+    pool = create_pool(settings.database_url, max_size=1)
+    try:
+        applied = migrate(pool, migrator.MIGRATIONS_DIR)
+        return applied, migrator.current_version(pool)
+    finally:
+        pool.close()
 
 
 def build_container(

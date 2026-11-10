@@ -8,7 +8,13 @@ from pathlib import Path
 import typer
 
 from ...application.services import NotFoundError
-from ...container import Container, DatabaseConfigError, get_container
+from ...container import (
+    Container,
+    DatabaseConfigError,
+    MigrationError,
+    get_container,
+    run_migrations,
+)
 from ...domain.models import ChainEvent
 from ...domain.ports import DailyQuotaError, TranslationError
 
@@ -180,6 +186,20 @@ def glossary_list(novel_id: int):
 def glossary_rm(novel_id: int, source: str):
     if not _c().glossary.remove_term(novel_id, source):
         _fail(f"Không có thuật ngữ '{source}'")
+
+
+@app.command("migrate")
+def migrate_cmd():
+    """Áp dụng migration database còn thiếu rồi thoát (không cần key LLM hay mật khẩu)."""
+    try:
+        applied, version = run_migrations()
+    except (DatabaseConfigError, MigrationError) as e:
+        _fail(str(e))
+    if applied:
+        typer.echo(f"Đã áp dụng migration: {', '.join(str(v) for v in applied)} "
+                   f"(version hiện tại {version}).")
+    else:
+        typer.echo(f"Database đã cập nhật (version {version}), không có migration mới.")
 
 
 @app.command("hash-password")
