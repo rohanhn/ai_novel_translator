@@ -10,6 +10,7 @@ from functools import lru_cache
 from psycopg_pool import ConnectionPool
 
 from .application.auth import AuthService
+from .application.chapter_update import ChapterUpdateService
 from .application.imports import ImportDraftService
 from .application.jobs import TranslationJobManager
 from .application.prefetch import PrefetchService
@@ -41,6 +42,7 @@ class Container:
     settings: Settings
     library: LibraryService
     imports: ImportDraftService
+    chapter_updates: ChapterUpdateService
     glossary: GlossaryService
     translation: TranslationService
     exports: ExportService
@@ -117,10 +119,12 @@ def build_container(
     cover_fetcher = cover_fetcher or SafeHttpImageFetcher()
     library = LibraryService(repo, loader, on_delete=jobs.cancel_queued_for_novel,
                              covers=cover_processor, cover_fetcher=cover_fetcher)
+    imports = ImportDraftService(library, loader)
     return Container(
         settings=settings,
         library=library,
-        imports=ImportDraftService(library, loader),
+        imports=imports,
+        chapter_updates=ChapterUpdateService(repo, imports, jobs),
         glossary=GlossaryService(repo),
         translation=translation,
         exports=ExportService(repo, {"txt": TxtExporter()}),
