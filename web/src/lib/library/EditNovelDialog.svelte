@@ -198,7 +198,7 @@
 		</div>
 
 		<div class="fields">
-			<div class="row">
+			<div class="group">
 				<label for="{formId}-link">Hoặc dán link ảnh</label>
 				<div class="link">
 					<input
@@ -228,7 +228,7 @@
 				{/if}
 			</div>
 
-			<div class="row">
+			<div class="group">
 				<label for="{formId}-title">Tên truyện</label>
 				<input
 					id="{formId}-title"
@@ -242,7 +242,7 @@
 				{#if errors.title}<p class="err" role="alert" id="{formId}-title-err">{errors.title}</p>{/if}
 			</div>
 
-			<div class="row">
+			<div class="group">
 				<label for="{formId}-author">Tác giả</label>
 				<input
 					id="{formId}-author"
@@ -255,7 +255,7 @@
 				{#if errors.author}<p class="err" role="alert" id="{formId}-author-err">{errors.author}</p>{/if}
 			</div>
 
-			<div class="row">
+			<div class="group">
 				<label for="{formId}-description">
 					Giới thiệu ngắn
 					<span class="count" aria-live="polite">{description.length}/{DESCRIPTION_MAX}</span>
@@ -316,7 +316,7 @@
 		gap: 16px;
 		min-width: 0;
 	}
-	.row {
+	.group {
 		display: flex;
 		flex-direction: column;
 		gap: 6px;

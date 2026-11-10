@@ -19,9 +19,13 @@
 
 	// Truyện đọc gần nhất (API đã xếp đọc gần nhất lên đầu).
 	const current = $derived(novels?.find((n) => n.last_read_chapter != null) ?? null);
-	const visible = $derived(
-		(novels ?? []).filter((n) => n.title.toLowerCase().includes(query.trim().toLowerCase()))
-	);
+	// Tìm theo tên hoặc tác giả, không phân biệt hoa thường.
+	const visible = $derived.by(() => {
+		const q = query.trim().toLowerCase();
+		return (novels ?? []).filter(
+			(n) => n.title.toLowerCase().includes(q) || (n.author ?? '').toLowerCase().includes(q)
+		);
+	});
 
 	async function load() {
 		try {
@@ -64,10 +68,11 @@
 		{#if current && current.last_read_chapter != null}
 			<ScrollFrame aria-labelledby="hero-h" padding="32px 36px">
 				<div class="hero">
-					<Cover id={current.id} title={current.title} height={220} />
+					<Cover id={current.id} title={current.title} height={220} src={current.cover_url} />
 					<div class="hero-body">
 						<span id="hero-h" class="eyebrow">Tiếp tục tu luyện · đọc tiếp</span>
 						<h1>{current.title}</h1>
+						{#if current.author}<p class="author">{current.author}</p>{/if}
 						<p class="where">
 							Đang ở <strong>{chapterLabel(hero?.chapter ?? null, current.last_read_chapter)}</strong>
 							{#if hero?.progress}· đã đọc {Math.round(hero.progress.position * 100)}%{/if}
@@ -109,7 +114,7 @@
 						><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg
 					>
 					<span class="sr-only">Tìm truyện</span>
-					<input type="search" bind:value={query} placeholder="Tìm truyện…" />
+					<input type="search" bind:value={query} placeholder="Tìm tên hoặc tác giả…" />
 				</label>
 				<button class="btn btn-ink" onclick={() => (uploadOpen = true)}>
 					<svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
@@ -135,8 +140,9 @@
 				{#each visible as n (n.id)}
 					<li class="card">
 						<a class="card-link" href="/novels/{n.id}">
-							<Cover id={n.id} title={n.title} />
+							<Cover id={n.id} title={n.title} src={n.cover_url} />
 							<strong class="card-title">{n.title}</strong>
+							{#if n.author}<span class="card-author">{n.author}</span>{/if}
 						</a>
 						<div class="card-progress">
 							<div class="progress-text">
@@ -324,6 +330,17 @@
 		font-size: 21px;
 		line-height: 1.15;
 		overflow-wrap: anywhere;
+	}
+	.card-author,
+	.author {
+		margin: -6px 0 0;
+		font-size: 13px;
+		color: var(--ink-muted);
+		overflow-wrap: anywhere;
+	}
+	.author {
+		margin: 2px 0 0;
+		font-size: 15px;
 	}
 	.card-link:hover .card-title {
 		color: var(--cinnabar);

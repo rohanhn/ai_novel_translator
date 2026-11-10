@@ -9,6 +9,7 @@
 	import { chipsFor } from '#lib/components/status.js';
 	import { hanNumber } from '#lib/han.js';
 	import DeleteDialog from '#lib/library/DeleteDialog.svelte';
+	import EditNovelDialog from '#lib/library/EditNovelDialog.svelte';
 	import { percent, realm } from '#lib/realm.js';
 	import type { ChapterSummary, Novel, Progress, Suggestion } from '#lib/types.js';
 
@@ -22,6 +23,14 @@
 	let notFound = $state(false);
 	let filter = $state<Filter>('all');
 	let deleting = $state<Novel | null>(null);
+	let editing = $state(false);
+	let introOpen = $state(false);
+
+	// Giới thiệu dài (hơn ~6 dòng) được gập lại, có nút "Xem thêm".
+	const introLong = $derived(
+		!!novel?.description &&
+			(novel.description.split('\n').length > 6 || novel.description.length > 420)
+	);
 
 	const isDone = (c: ChapterSummary) => c.status === 'translated' || c.status === 'edited';
 	const needsReview = (c: ChapterSummary) =>
@@ -93,9 +102,29 @@
 		{:else if novel && chapters}
 			<ScrollFrame padding="32px 36px">
 				<div class="hero">
-					<Cover id={novel.id} title={novel.title} height={220} />
+					<Cover id={novel.id} title={novel.title} height={220} src={novel.cover_url} />
 					<div class="info">
-						<h1>{novel.title}</h1>
+						<div class="heading">
+							<h1>{novel.title}</h1>
+							{#if novel.author}<p class="author">Tác giả: {novel.author}</p>{/if}
+						</div>
+						{#if novel.description}
+							<div class="intro">
+								<!-- nội dung trên một dòng: white-space pre-line giữ mọi xuống dòng -->
+								<p id="intro-text" class="intro-text" class:clamped={introLong && !introOpen}>{novel.description}</p>
+								{#if introLong}
+									<button
+										type="button"
+										class="btn btn-ghost more"
+										aria-expanded={introOpen}
+										aria-controls="intro-text"
+										onclick={() => (introOpen = !introOpen)}
+									>
+										{introOpen ? 'Thu gọn' : 'Xem thêm'}
+									</button>
+								{/if}
+							</div>
+						{/if}
 						<dl>
 							<div><dt>Upload lúc</dt><dd>{fmtDate(novel.created_at)}</dd></div>
 							{#if novel.pretranslated}
@@ -125,6 +154,9 @@
 								Danh Lục · Bộ tên
 								{#if pending}<span class="count" aria-label="{pending} tên chờ duyệt">{pending}</span>{/if}
 							</a>
+							<button type="button" class="btn btn-ghost" onclick={() => (editing = true)}>
+								Sửa thông tin
+							</button>
 						</div>
 					</div>
 				</div>
@@ -177,6 +209,9 @@
 </div>
 
 <DeleteDialog bind:novel={deleting} ondeleted={() => goto('/')} />
+{#if novel}
+	<EditNovelDialog bind:open={editing} {novel} onsaved={(n) => (novel = n)} />
+{/if}
 
 <style>
 	.page {
@@ -219,6 +254,37 @@
 	h1 {
 		font-size: 44px;
 		overflow-wrap: anywhere;
+	}
+	.author {
+		margin: 4px 0 0;
+		font-size: 15px;
+		color: var(--ink-muted);
+		overflow-wrap: anywhere;
+	}
+	.intro {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 2px;
+		max-width: 68ch;
+	}
+	.intro-text {
+		margin: 0;
+		white-space: pre-line;
+		font-family: var(--font-body);
+		font-size: 15px;
+		line-height: 1.65;
+		overflow-wrap: anywhere;
+	}
+	.intro-text.clamped {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 6;
+		line-clamp: 6;
+		overflow: hidden;
+	}
+	.more {
+		margin-left: -14px;
 	}
 	dl {
 		margin: 0;
