@@ -73,7 +73,7 @@
 
 - [x] 10.1 `Dockerfile` multi-stage (Node build `web/` → Python 3.14 slim, cùng phiên bản với môi trường dev; uvicorn `--workers 1`; không cần volume dữ liệu) và `docker-compose.yml` mẫu nối vào Docker network `external` của `shared-postgres` (tên network và host lấy từ biến); kiểm tra `docker build` thành công và container trả `/health` OK khi chạy cùng `shared-postgres` local
 - [x] 10.2 Viết `docs/DEPLOY.md`: lệnh SQL tạo role + database, biến môi trường, tạo hash mật khẩu, cách tìm tên network của `shared-postgres`, cấu hình reverse proxy cho subdomain (Nginx và Caddy, tắt buffering cho SSE), sao lưu bằng `pg_dump -Fc` và rollback bằng `pg_restore`; kiểm tra bằng cách làm theo tài liệu trên máy local với docker compose
-- [ ] 10.3 Cập nhật `docs/ARCHITECTURE.md` (sơ đồ có web/SSE/job manager/chain, bảng lớp, backlog mới, mục ngôn ngữ giao diện tóm tắt D11 kèm link mockup) và `CLAUDE.md` (lệnh build web, env mới); kiểm tra các lệnh ghi trong tài liệu chạy được
+- [x] 10.3 Cập nhật `docs/ARCHITECTURE.md` (sơ đồ có web/SSE/job manager/chain, bảng lớp, backlog mới, mục ngôn ngữ giao diện tóm tắt D11 kèm link mockup) và `CLAUDE.md` (lệnh build web, env mới); kiểm tra các lệnh ghi trong tài liệu chạy được
 
 ## 11. Kiểm tra tích hợp
 
