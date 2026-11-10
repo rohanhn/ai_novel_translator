@@ -191,3 +191,183 @@ def test_append_needs_start_then_owner_picks(container, novel):
     res = apply_with_preview(container, d, "append", start=2)
     assert res.added == 1
     assert container.repo.get_chapter(novel.id, 6).title == "番外 二"
+
+
+# --- apply: replace ---------------------------------------------------------------------------
+
+SIDE = "番外 雪夜\n" + "番外的正文内容。" * 5
+
+
+def by_title(repo, novel_id):
+    return {c.title: c for c in repo.list_chapters(novel_id)}
+
+
+def test_chapter_inserted_in_the_middle(container, novel):
+    d = draft_for(container, novel, zh_txt(range(1, 6), extra_before={4: SIDE}))
+    res = apply_with_preview(container, d, "replace")
+    chs = container.repo.list_chapters(novel.id)
+    assert [c.title for c in chs] == ["第1章 标题1", "第2章 标题2", "第3章 标题3", "番外 雪夜",
+                                      "第4章 标题4", "第5章 标题5"]
+    assert [c.index for c in chs] == [1, 2, 3, 4, 5, 6]
+    assert (res.reused, res.new, res.changed, res.chapter_count) == (5, 1, 0, 6)
+
+
+def test_unchanged_chapters_keep_translation_and_edits(container, novel):
+    d = draft_for(container, novel, zh_txt(range(1, 7)))
+    apply_with_preview(container, d, "replace")
+    t = by_title(container.repo, novel.id)
+    c2, c3 = t["第2章 标题2"], t["第3章 标题3"]
+    assert (c2.status, c2.translated_text, c2.provider) == (
+        ChapterStatus.TRANSLATED, "Bản dịch 2", "gemini")
+    assert (c3.status, c3.translated_text) == (ChapterStatus.EDITED, "Bản dịch 3")
+    assert t["第6章 标题6"].status == ChapterStatus.PENDING
+    assert not container.jobs.has_jobs_for_novel(novel.id)  # không có request dịch nào
+
+
+def test_revised_chapters_lose_translation_even_when_edited(container, novel):
+    d = draft_for(container, novel, zh_txt(range(1, 6), revised={2, 3}))
+    p = container.chapter_updates.preview(d.id, "replace", d.plan.boundaries)
+    assert [s.index for s in p.replace.edited_lost] == [3]
+    res = container.chapter_updates.apply(d.id, "replace", d.plan.boundaries,
+                                          revision=p.revision)
+    assert res.changed == 2
+    t = by_title(container.repo, novel.id)
+    for title in ("第2章 标题2", "第3章 标题3"):
+        c = t[title]
+        assert (c.status, c.translated_text, c.provider) == (ChapterStatus.PENDING, None, None)
+        assert c.source_text.endswith("作者修改。")
+
+
+def test_missing_chapter_kept_by_default(container, novel):
+    d = draft_for(container, novel, zh_txt([1, 2, 4, 5]))
+    res = apply_with_preview(container, d, "replace")
+    chs = container.repo.list_chapters(novel.id)
+    assert [c.title for c in chs] == [f"第{n}章 标题{n}" for n in (1, 2, 3, 4, 5)]
+    assert chs[2].status == ChapterStatus.EDITED and chs[2].translated_text == "Bản dịch 3"
+    assert (res.kept, res.deleted) == (1, 0)
+
+
+def test_missing_chapter_deleted(container, novel):
+    d = draft_for(container, novel, zh_txt([1, 2, 4, 5]))
+    res = apply_with_preview(container, d, "replace", delete=[3])
+    chs = container.repo.list_chapters(novel.id)
+    assert [c.title for c in chs] == [f"第{n}章 标题{n}" for n in (1, 2, 4, 5)]
+    assert [c.index for c in chs] == [1, 2, 3, 4]
+    assert res.deleted == 1
+
+
+def test_replace_moves_reading_progress(container, novel):
+    repo = container.repo
+    repo.save_progress(ReadingProgress(novel.id, 4, 0.4))
+    d = draft_for(container, novel, zh_txt(range(1, 6), extra_before={4: SIDE}))
+    res = apply_with_preview(container, d, "replace")
+    p = repo.get_progress(novel.id)
+    assert (p.chapter_index, p.position) == (5, 0.4)
+    assert (res.progress.from_index, res.progress.to_index) == (4, 5)
+
+
+def test_replace_keeps_glossary_and_details(container, novel):
+    from novel_translator.domain.models import GlossaryEntry
+
+    repo = container.repo
+    repo.update_novel_details(novel.id, {"author": "Thiên Tàm Thổ Đậu"})
+    for i in range(40):
+        repo.upsert_glossary(GlossaryEntry(novel.id, f"词{i}", f"Từ {i}"))
+    before = repo.get_novel(novel.id)
+    d = draft_for(container, novel, zh_txt(range(1, 7), revised={1}))
+    apply_with_preview(container, d, "replace")
+    after = repo.get_novel(novel.id)
+    assert (after.title, after.author, after.glossary_version) == (
+        before.title, "Thiên Tàm Thổ Đậu", before.glossary_version)
+    assert len(repo.list_glossary(novel.id)) == 40
+
+
+def test_replace_rejected_while_job_running(container, novel, monkeypatch):
+    import threading
+
+    from novel_translator.application.jobs import Lane
+    from novel_translator.application.services import NovelBusyError
+
+    started, release = threading.Event(), threading.Event()
+    real = container.translation.translate_chapter
+
+    def slow(*a, **kw):
+        started.set()
+        assert release.wait(5)
+        return real(*a, **kw)
+
+    monkeypatch.setattr(container.translation, "translate_chapter", slow)
+    job = container.jobs.submit(novel.id, 5, Lane.FOREGROUND)
+    assert started.wait(5)
+    d = draft_for(container, novel, zh_txt(range(1, 7)))
+    p = container.chapter_updates.preview(d.id, "replace", d.plan.boundaries)
+    before = snapshot(container.repo, novel.id)
+    try:
+        with pytest.raises(NovelBusyError):
+            container.chapter_updates.apply(d.id, "replace", d.plan.boundaries,
+                                            revision=p.revision)
+        assert snapshot(container.repo, novel.id) == before
+    finally:
+        release.set()
+        assert job.wait(5)
+
+
+def test_replace_cancels_queued_prefetch(container, novel, monkeypatch):
+    import threading
+
+    from novel_translator.application.jobs import Lane
+
+    other = container.library.import_bytes(zh_txt([1, 2]), "Khác", "zh").novel
+    started, release = threading.Event(), threading.Event()
+    real = container.translation.translate_chapter
+
+    def slow(novel_id, *a, **kw):
+        if novel_id == other.id:
+            started.set()
+            assert release.wait(5)
+        return real(novel_id, *a, **kw)
+
+    monkeypatch.setattr(container.translation, "translate_chapter", slow)
+    blocker = container.jobs.submit(other.id, 1, Lane.BACKGROUND)  # giữ làn background bận
+    assert started.wait(5)
+    queued = container.jobs.submit(novel.id, 4, Lane.BACKGROUND)  # prefetch còn chờ
+    try:
+        d = draft_for(container, novel, zh_txt(range(1, 7)))
+        res = apply_with_preview(container, d, "replace")
+        assert res.new == 1
+        assert queued.wait(5) and queued.terminal_event.type == "cancelled"
+    finally:
+        release.set()
+        assert blocker.wait(5)
+
+
+def test_failure_while_saving_rolls_back_and_keeps_draft(container, novel, monkeypatch):
+    repo = container.repo
+    repo.save_progress(ReadingProgress(novel.id, 4, 0.4))
+    before, progress = snapshot(repo, novel.id), repo.get_progress(novel.id)
+    d = draft_for(container, novel, zh_txt(range(1, 6), extra_before={4: SIDE}))
+    p = container.chapter_updates.preview(d.id, "replace", d.plan.boundaries)
+
+    def boom(_progress):
+        raise RuntimeError("mất kết nối giữa chừng")
+
+    monkeypatch.setattr(repo, "save_progress", boom)
+    with pytest.raises(RuntimeError):
+        container.chapter_updates.apply(d.id, "replace", d.plan.boundaries, revision=p.revision)
+    assert snapshot(repo, novel.id) == before
+    assert repo.get_progress(novel.id).chapter_index == progress.chapter_index
+    monkeypatch.undo()
+    res = container.chapter_updates.apply(d.id, "replace", d.plan.boundaries,
+                                          revision=p.revision)  # draft còn: áp lại được
+    assert res.chapter_count == 6
+
+
+def test_replace_rejected_when_stale(container, novel):
+    repo = container.repo
+    d = draft_for(container, novel, zh_txt(range(1, 7)))
+    p = container.chapter_updates.preview(d.id, "replace", d.plan.boundaries)
+    ch = repo.get_chapter(novel.id, 1)
+    ch.status = ChapterStatus.FAILED
+    repo.update_chapter(ch)
+    with pytest.raises(StalePreviewError):
+        container.chapter_updates.apply(d.id, "replace", d.plan.boundaries, revision=p.revision)

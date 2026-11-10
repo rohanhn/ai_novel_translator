@@ -9,17 +9,18 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 
 from ..domain import chapter_merge, chapter_split
-from ..domain.models import Chapter, Novel
+from ..domain.models import Chapter, ChapterStatus, Novel, ReadingProgress
 from ..domain.ports import NovelRepository
 from .imports import Draft, ImportDraftService
-from .jobs import TranslationJobManager
-from .services import InvalidOperationError, NotFoundError, new_chapter
+from .jobs import Lane, TranslationJobManager
+from .services import InvalidOperationError, NotFoundError, NovelBusyError, new_chapter
 
 SUPPORTED_DETECTED = ("zh", "vi")
+_Kind = chapter_merge.EntryKind
 
 
 class UpdateMode(str, Enum):
@@ -167,7 +168,7 @@ class ChapterUpdateService:
         if UpdateMode(mode) is UpdateMode.APPEND:
             result = self._apply_append(draft, boundaries, keep_front_matter, start, revision)
         else:
-            raise NotImplementedError
+            result = self._apply_replace(draft, boundaries, keep_front_matter, delete, revision)
         self.drafts.discard(draft_id)
         return result
 
@@ -194,6 +195,47 @@ class ChapterUpdateService:
                                              keep_front_matter, start, ())
         self._check_revision(preview, revision)
         return self._append(preview.novel, chapters, preview.append)
+
+    def _apply_replace(self, draft: Draft, boundaries: list[int],
+                       keep_front_matter: bool | None, delete: Iterable[int],
+                       revision: str) -> UpdateResult:
+        """Thay danh sách chương (design D3/D4): giữ truyện để không có job mới chen vào, bỏ
+        prefetch còn chờ, từ chối khi còn job dịch, rồi ghi chương + tiến độ trong một
+        transaction."""
+        novel = self._novel_of(draft)
+        with self.jobs.hold_novel(novel.id):
+            self.jobs.cancel_queued_for_novel(novel.id, Lane.BACKGROUND)
+            if self.jobs.has_jobs_for_novel(novel.id):
+                raise NovelBusyError("Đang có chương của truyện được dịch; đợi dịch xong rồi tải "
+                                     "lại cả bộ.")
+            preview, chapters, _ = self._compute(draft, UpdateMode.REPLACE, boundaries,
+                                                 keep_front_matter, None, delete)
+            self._check_revision(preview, revision)
+            plan = preview.replace
+            by_index = {c.index: c for c in chapters}
+            result: list[Chapter] = []
+            for i, e in enumerate(plan.entries, start=1):
+                if e.kind in (_Kind.REUSE, _Kind.KEPT):
+                    old = by_index[e.stored.index]
+                    ch = replace(old, id=None, index=i)
+                    if e.kind is _Kind.REUSE:
+                        ch.title = e.incoming.title  # thứ tự và tiêu đề gốc theo file mới
+                    if ch.status == ChapterStatus.TRANSLATING:
+                        ch.status = ChapterStatus.PENDING  # không còn job nào đang dịch nó
+                    result.append(ch)
+                else:  # CHANGED, NEW: nội dung mới, bỏ bản dịch cũ (kể cả bản sửa tay)
+                    result.append(new_chapter(preview.novel, i, e.incoming.title, e.incoming.body))
+            with self.repo.unit_of_work():
+                self.repo.replace_chapters(preview.novel.id, result)
+                if preview.progress is not None:
+                    self.repo.save_progress(ReadingProgress(
+                        preview.novel.id, preview.progress.to_index,
+                        preview.progress.to_position))
+        return UpdateResult(
+            preview.novel, UpdateMode.REPLACE, len(result),
+            reused=plan.count(_Kind.REUSE), changed=plan.count(_Kind.CHANGED),
+            new=plan.count(_Kind.NEW), kept=plan.count(_Kind.KEPT), deleted=len(plan.deleted),
+            progress=preview.progress)
 
 
 __all__ = [
