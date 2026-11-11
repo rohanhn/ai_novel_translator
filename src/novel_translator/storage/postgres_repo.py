@@ -142,11 +142,12 @@ class PostgresRepository:
         row = self._one(
             "UPDATE chapters SET translated_title = %s, translated_text = %s, status = %s,"
             " provider = %s, model = %s, chain_step = %s, glossary_version = %s,"
-            " glossary_outdated = %s, possible_omission = %s, updated_at = now()"
-            " WHERE id = %s RETURNING updated_at",
+            " glossary_outdated = %s, possible_omission = %s, untranslated_han = %s,"
+            " updated_at = now() WHERE id = %s RETURNING updated_at",
             (chapter.translated_title, chapter.translated_text, chapter.status.value,
              chapter.provider, chapter.model, chapter.chain_step, chapter.glossary_version,
-             chapter.glossary_outdated, chapter.possible_omission, chapter.id),
+             chapter.glossary_outdated, chapter.possible_omission, chapter.untranslated_han,
+             chapter.id),
         )
         if row:
             chapter.updated_at = row["updated_at"]
@@ -345,7 +346,8 @@ def _novel(r: dict[str, Any]) -> Novel:
 _INSERT_CHAPTER = (
     "INSERT INTO chapters (novel_id, idx, title, source_text, translated_title, translated_text,"
     " status, provider, model, chain_step, glossary_version, glossary_outdated, possible_omission,"
-    " updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id"
+    " untranslated_han, updated_at)"
+    " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id"
 )
 
 
@@ -357,7 +359,8 @@ def _insert_chapters(conn: Connection, chapters: list[Chapter]) -> None:
         cur.executemany(_INSERT_CHAPTER, [
             (ch.novel_id, ch.index, ch.title, ch.source_text, ch.translated_title,
              ch.translated_text, ch.status.value, ch.provider, ch.model, ch.chain_step,
-             ch.glossary_version, ch.glossary_outdated, ch.possible_omission, ch.updated_at)
+             ch.glossary_version, ch.glossary_outdated, ch.possible_omission,
+             ch.untranslated_han, ch.updated_at)
             for ch in chapters
         ], returning=True)
         for ch in chapters:
@@ -372,7 +375,8 @@ def _chapter(r: dict[str, Any]) -> Chapter:
         translated_text=r["translated_text"], status=ChapterStatus(r["status"]),
         provider=r["provider"], model=r["model"], chain_step=r["chain_step"],
         glossary_version=r["glossary_version"], glossary_outdated=r["glossary_outdated"],
-        possible_omission=r["possible_omission"], updated_at=r["updated_at"],
+        possible_omission=r["possible_omission"], untranslated_han=r["untranslated_han"],
+        updated_at=r["updated_at"],
     )
 
 

@@ -6,7 +6,7 @@
 
 ## 2. Lưu trữ
 
-- [ ] 2.1 Migration `003_untranslated_han.sql` (design D2, D7): thêm cột `untranslated_han INT NOT NULL DEFAULT 0`, rồi tính sẵn bằng `regexp_count`, bỏ các chữ Hán có trong bản dịch glossary của cùng truyện. `Chapter.untranslated_han`; repo đọc và ghi cột trong `update_chapter`, `_insert_chapters`, `_chapter`. Kiểm tra bằng `tests/test_storage.py`:
+- [x] 2.1 Migration `003_untranslated_han.sql` (design D2, D7): thêm cột `untranslated_han INT NOT NULL DEFAULT 0`, rồi tính sẵn bằng `regexp_count`, bỏ các chữ Hán có trong bản dịch glossary của cùng truyện. `Chapter.untranslated_han`; repo đọc và ghi cột trong `update_chapter`, `_insert_chapters`, `_chapter`. Kiểm tra bằng `tests/test_storage.py`:
   - ghi rồi đọc lại giữ đúng giá trị qua `update_chapter`, `add_chapters`, `replace_chapters`;
   - test migration theo scenario "Existing translations after upgrade": dựng chương có chữ Hán, chữ do glossary giữ và dấu câu CJK, chạy câu tính sẵn, kết quả bằng `residue(...).count`.
 

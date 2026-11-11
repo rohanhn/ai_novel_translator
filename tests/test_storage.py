@@ -105,6 +105,42 @@ def test_migrations_dir_ships_initial():
     assert (MIGRATIONS_DIR / "001_initial.sql").exists()
 
 
+def test_migration_backfills_untranslated_han_like_residue(scratch_conn, tmp_path):
+    """Migration 003 tính sẵn số chữ Hán còn sót, khớp với domain/han_residue."""
+    import shutil
+
+    from novel_translator.domain.han_residue import kept_chars, residue
+
+    files = sorted(MIGRATIONS_DIR.glob("*.sql"))
+    upto = [f for f in files if int(f.name[:3]) < 3]
+    for f in upto:
+        shutil.copy(f, tmp_path / f.name)
+    migrate(scratch_conn, tmp_path)
+    nid = scratch_conn.execute(
+        "INSERT INTO novels (title) VALUES ('t') RETURNING id").fetchone()["id"]
+    scratch_conn.execute("INSERT INTO glossary (novel_id, source_term, target_term)"
+                         " VALUES (%s, '丹', 'Đan (丹)')", (nid,))
+    cases = [
+        ("Chương 1", "hoảng đ蕩着 hoàn nhiệt\nthảm đạm 幽 lục, 瞬 𠀀"),
+        ("Chương 2: Mộc 鸢", "Viên Đan (丹) này《Sơn Hải Kinh》，「được」。"),
+        ("Chương 3", "Sạch sẽ."),
+        (None, None),
+    ]
+    for i, (title, text) in enumerate(cases, start=1):
+        scratch_conn.execute(
+            "INSERT INTO chapters (novel_id, idx, title, source_text, translated_title,"
+            " translated_text, status) VALUES (%s, %s, 'x', 'y', %s, %s, %s)",
+            (nid, i, title, text, "translated" if text else "pending"))
+    for f in files:
+        shutil.copy(f, tmp_path / f.name)
+    migrate(scratch_conn, tmp_path)
+    got = [r["untranslated_han"] for r in scratch_conn.execute(
+        "SELECT untranslated_han FROM chapters ORDER BY idx").fetchall()]
+    kept = kept_chars(["Đan (丹)"])
+    assert got == [residue(t, x, kept).count if x else 0 for t, x in cases]
+    assert got == [5, 1, 0, 0]
+
+
 # ---------- 2.4 fixture dọn dữ liệu ----------
 
 
@@ -144,6 +180,23 @@ def test_chapter_new_fields_roundtrip(repo):
     assert (got.status, got.chain_step, got.glossary_version) == (ChapterStatus.EDITED, 2, 3)
     assert got.glossary_outdated and got.possible_omission
     assert got.updated_at.tzinfo is not None
+
+
+def test_untranslated_han_roundtrip(repo):
+    novel = _novel_with_chapters(repo, 1)
+    ch = repo.get_chapter(novel.id, 1)
+    assert ch.untranslated_han == 0
+    ch.translated_text, ch.status, ch.untranslated_han = "幽 lục", ChapterStatus.TRANSLATED, 1
+    repo.update_chapter(ch)
+    assert repo.get_chapter(novel.id, 1).untranslated_han == 1
+    copy = Chapter(novel_id=novel.id, index=2, title="x", source_text="y",
+                   translated_text="蕩着", status=ChapterStatus.TRANSLATED, untranslated_han=2)
+    repo.add_chapters([copy])
+    assert repo.get_chapter(novel.id, 2).untranslated_han == 2
+    chs = repo.list_chapters(novel.id)
+    chs[0].index, chs[1].index = 2, 1  # đổi chỗ hai chương
+    repo.replace_chapters(novel.id, chs)
+    assert [c.untranslated_han for c in repo.list_chapters(novel.id)] == [2, 1]
 
 
 def test_novel_glossary_version_and_last_read(repo):

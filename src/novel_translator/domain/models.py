@@ -65,6 +65,7 @@ class Chapter:
     glossary_version: int | None = None  # phiên bản bộ tên dùng lúc dịch
     glossary_outdated: bool = False
     possible_omission: bool = False
+    untranslated_han: int = 0  # số chữ Hán còn sót trong bản dịch
     id: int | None = None
     updated_at: datetime = field(default_factory=_now)
 
