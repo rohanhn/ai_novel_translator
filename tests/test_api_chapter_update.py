@@ -81,6 +81,26 @@ def test_replace_flow_with_delete(api_client):
     assert titles == [f"第{n}章 标题{n}" for n in (1, 2, 4, 5, 6)]
 
 
+def test_preview_lists_middle_and_new_positions(api_client):
+    nid = make_novel(api_client, numbers=[1, 2, 3, 6, 7])
+    p = upload_update(api_client, nid, zh(range(1, 9))).json()
+    body = {"mode": "append", "boundaries": p["boundaries"]}
+    pv = api_client.post(f"/api/imports/{p['id']}/update-preview", json=body).json()
+    assert [c["title"] for c in pv["to_add"]] == ["第8章 标题8"]
+    assert pv["middle"] == [{"position": 4, "title": "第4章 标题4"},
+                            {"position": 5, "title": "第5章 标题5"}]
+    p = upload_update(api_client, nid, zh([4, 5])).json()
+    body = {"mode": "replace", "boundaries": p["boundaries"]}
+    pv = api_client.post(f"/api/imports/{p['id']}/update-preview", json=body).json()
+    assert pv["new"] == [{"position": 1, "title": "第4章 标题4", "index": 4},
+                         {"position": 2, "title": "第5章 标题5", "index": 5}]
+    assert pv["middle"] == []
+    r = api_client.post(f"/api/imports/{p['id']}/update", json={**body, "revision": pv["revision"]})
+    assert r.status_code == 200, r.text
+    titles = [c["title"] for c in api_client.get(f"/api/novels/{nid}/chapters").json()]
+    assert titles == [f"第{n}章 标题{n}" for n in range(1, 8)]
+
+
 def test_mode_missing(api_client):
     nid = make_novel(api_client)
     p = upload_update(api_client, nid, zh(range(1, 7))).json()

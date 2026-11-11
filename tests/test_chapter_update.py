@@ -371,3 +371,48 @@ def test_replace_rejected_when_stale(container, novel):
     repo.update_chapter(ch)
     with pytest.raises(StalePreviewError):
         container.chapter_updates.apply(d.id, "replace", d.plan.boundaries, revision=p.revision)
+
+
+# --- Bổ sung chương thiếu nằm giữa (task 7.2) ---------------------------------------------------
+
+
+@pytest.fixture
+def gappy(container):
+    """Truyện tiếng Trung thiếu chương 4, 5 (đang có 1, 2, 3, 6, 7); chương 6 đã dịch."""
+    n = container.library.import_bytes(zh_txt([1, 2, 3, 6, 7]), "Vũ Động", "zh").novel
+    ch = container.repo.get_chapter(n.id, 4)
+    assert ch.title == "第6章 标题6"
+    ch.translated_title, ch.translated_text = "Chương 6", "Bản dịch 6"
+    ch.status, ch.provider = ChapterStatus.TRANSLATED, "gemini"
+    container.repo.update_chapter(ch)
+    return n
+
+
+def test_append_preview_lists_middle_chapters(container, gappy):
+    d = draft_for(container, gappy, zh_txt(range(1, 9)))
+    p = container.chapter_updates.preview(d.id, "append", d.plan.boundaries)
+    assert [c.title for c in p.append.to_add] == ["第8章 标题8"]
+    assert [c.title for c in p.append.middle] == ["第4章 标题4", "第5章 标题5"]
+
+
+def test_replace_preview_shows_where_new_chapters_go(container, gappy):
+    d = draft_for(container, gappy, zh_txt([4, 5]))
+    p = container.chapter_updates.preview(d.id, "replace", d.plan.boundaries)
+    new = [(i, e.incoming.title) for i, e in enumerate(p.replace.entries, start=1)
+           if e.kind.value == "new"]
+    assert new == [(4, "第4章 标题4"), (5, "第5章 标题5")]
+
+
+def test_file_with_only_missing_chapters_fills_the_gap(container, gappy):
+    repo = container.repo
+    repo.save_progress(ReadingProgress(gappy.id, 4, 0.4))  # đang đọc chương 6
+    d = draft_for(container, gappy, zh_txt([4, 5]))
+    res = apply_with_preview(container, d, "replace")
+    chs = repo.list_chapters(gappy.id)
+    assert [c.title for c in chs] == [f"第{n}章 标题{n}" for n in range(1, 8)]
+    assert [c.index for c in chs] == list(range(1, 8))
+    assert (chs[5].status, chs[5].translated_text) == (ChapterStatus.TRANSLATED, "Bản dịch 6")
+    assert [chs[i].status for i in (3, 4)] == [ChapterStatus.PENDING] * 2
+    assert (res.new, res.kept, res.deleted) == (2, 5, 0)
+    p = repo.get_progress(gappy.id)
+    assert (p.chapter_index, p.position) == (6, 0.4)

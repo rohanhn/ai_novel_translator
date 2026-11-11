@@ -65,7 +65,7 @@
 ## 7. Bổ sung chương thiếu nằm giữa
 
 - [x] 7.1 Domain (design D1): `plan_replace` trộn chương `kept` với mục `new` theo số chương trong từng chỗ, kèm chốt an toàn; `plan_append` trả `middle`. Kiểm tra bằng `tests/test_chapter_merge.py` theo các scenario "File contains only the missing chapters", "Partial file around the gap", "Kept chapters without numbers", "Numbering restarts per volume" và "File has chapters missing from the middle of the novel"; các test cũ của `plan_replace`/`plan_append` vẫn pass, test hiệu năng 2000 chương vẫn dưới 2 giây.
-- [ ] 7.2 Service, API và schema (design D5): `UpdatePreview` thêm `middle[{position, title}]` cho append và `new[{position, title, index}]` cho replace. Kiểm tra bằng `tests/test_chapter_update.py` và `tests/test_api_chapter_update.py` theo scenario "Replace preview shows where new chapters go" và tiến độ đọc trỏ đúng chương sau khi chèn giữa.
+- [x] 7.2 Service, API và schema (design D5): `UpdatePreview` thêm `middle[{position, title}]` cho append và `new[{position, title, index}]` cho replace. Kiểm tra bằng `tests/test_chapter_update.py` và `tests/test_api_chapter_update.py` theo scenario "Replace preview shows where new chapters go" và tiến độ đọc trỏ đúng chương sau khi chèn giữa.
 - [ ] 7.3 Web (design D6): thông báo `middle` ở chế độ Thêm; danh sách chương mới kèm vị trí ở chế độ Tải lại. Thêm ca vào `web/e2e/chapter-update.spec.ts`: file chỉ có chương thiếu, chọn Tải lại, mục lục đúng thứ tự và chương cũ còn bản dịch. Kiểm tra `npm run check`, `npm run check:contrast`, `npm run build && npm run test:e2e` pass.
 - [ ] 7.4 Chạy lại toàn bộ kiểm tra như 6.1 và `openspec validate update-chapters-from-txt --strict`. Kiểm tra tất cả pass.
 

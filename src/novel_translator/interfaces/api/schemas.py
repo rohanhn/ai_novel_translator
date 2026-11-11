@@ -278,6 +278,14 @@ class ProgressMoveOut(BaseModel):
                    to_index=m.to_index, to_position=m.to_position)
 
 
+class NewChapterRef(BaseModel):
+    """Chương mới khi tải lại: vị trí trong file và số chương sẽ nhận sau khi tải lại."""
+
+    position: int
+    title: str
+    index: int
+
+
 class UpdateCounts(BaseModel):
     reuse: int
     changed: int
@@ -297,10 +305,12 @@ class UpdatePreviewOut(BaseModel):
     nothing_new: bool = False
     to_add: list[FileChapterRef] = Field(default_factory=list)
     differing: list[StoredChapterRef] = Field(default_factory=list)
+    middle: list[FileChapterRef] = Field(default_factory=list)  # chương thiếu ở giữa
     # chế độ tải lại
     counts: UpdateCounts | None = None
     changed: list[StoredChapterRef] = Field(default_factory=list)
     missing: list[StoredChapterRef] = Field(default_factory=list)
+    new: list[NewChapterRef] = Field(default_factory=list)
     edited_lost: list[StoredChapterRef] = Field(default_factory=list)
     progress: ProgressMoveOut | None = None
 
@@ -319,6 +329,7 @@ class UpdatePreviewOut(BaseModel):
             out.needs_start, out.nothing_new = a.needs_start, a.nothing_new
             out.to_add = [FileChapterRef(position=c.position, title=c.title) for c in a.to_add]
             out.differing = [StoredChapterRef.of(s) for s in a.differing]
+            out.middle = [FileChapterRef(position=c.position, title=c.title) for c in a.middle]
         if p.replace is not None:
             r = p.replace
             out.counts = UpdateCounts(reuse=r.count(EntryKind.REUSE),
@@ -327,6 +338,8 @@ class UpdatePreviewOut(BaseModel):
             out.changed = [StoredChapterRef.of(e.stored) for e in r.entries
                            if e.kind is EntryKind.CHANGED]
             out.missing = [StoredChapterRef.of(s) for s in r.missing]
+            out.new = [NewChapterRef(position=e.incoming.position, title=e.incoming.title, index=i)
+                       for i, e in enumerate(r.entries, start=1) if e.kind is EntryKind.NEW]
             out.edited_lost = [StoredChapterRef.of(s) for s in r.edited_lost]
         return out
 
