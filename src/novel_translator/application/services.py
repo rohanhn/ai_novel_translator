@@ -254,6 +254,14 @@ class GlossaryService:
     def list_terms(self, novel_id: int) -> list[GlossaryEntry]:
         return self.repo.list_glossary(novel_id)
 
+    def untranslated_chars(self, chapter: Chapter) -> tuple[str, ...]:
+        """Chữ Hán còn sót trong bản dịch của chương (riêng biệt, theo thứ tự xuất hiện), trừ
+        chữ do bộ tên hiện tại giữ. Dùng để tô sáng khi đọc."""
+        if not chapter.translated_text:
+            return ()
+        return residue(chapter.translated_title, chapter.translated_text,
+                       glossary_kept(self.repo, chapter.novel_id)).chars
+
     def remove_term(self, novel_id: int, source: str) -> bool:
         """Xóa tên; chương bị ảnh hưởng chỉ được gắn nhãn (không thay chữ)."""
         with self.repo.unit_of_work():

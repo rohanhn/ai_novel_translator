@@ -30,15 +30,15 @@ def list_chapters(novel_id: int, c: Container = Depends(get_container)):
 
 @router.get("/{index}", response_model=ChapterOut)
 def get_chapter(novel_id: int, index: int, c: Container = Depends(get_container)):
-    return ChapterOut.of(c.library.get_chapter(novel_id, index), _lane(c, novel_id, index))
+    ch = c.library.get_chapter(novel_id, index)
+    return ChapterOut.of(ch, _lane(c, novel_id, index), c.glossary.untranslated_chars(ch))
 
 
 @router.put("/{index}", response_model=ChapterOut)
 def edit_chapter(novel_id: int, index: int, body: ChapterEditIn,
                  c: Container = Depends(get_container)):
-    return ChapterOut.of(
-        c.editing.edit_chapter(novel_id, index, body.translated_title, body.translated_text)
-    )
+    ch = c.editing.edit_chapter(novel_id, index, body.translated_title, body.translated_text)
+    return ChapterOut.of(ch, untranslated_chars=c.glossary.untranslated_chars(ch))
 
 
 def stream_url(novel_id: int, index: int) -> str:

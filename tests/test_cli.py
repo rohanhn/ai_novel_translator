@@ -58,7 +58,7 @@ def test_translate_reports_fallback_step(use, sample_txt, monkeypatch):
     nid = _import(sample_txt)
     r = runner.invoke(cli.app, ["translate", str(nid), "1"])
     assert r.exit_code == 0, r.output
-    assert "(echo/nhe) [bước dự phòng 2]" in r.output
+    assert "(echo/nhe) [bước dự phòng 2, còn " in r.output  # echo giữ nguyên chữ Hán
 
 
 def test_translate_whole_chain_exhausted(use, sample_txt, monkeypatch):

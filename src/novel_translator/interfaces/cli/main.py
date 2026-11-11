@@ -128,7 +128,9 @@ def list_chapters(novel_id: int):
     """Liệt kê chương và trạng thái dịch."""
     try:
         for ch in _c().library.list_chapters(novel_id):
-            typer.echo(f"{ch.index}\t[{ch.status.value}]\t{ch.translated_title or ch.title}")
+            flag = (f"\t[còn {ch.untranslated_han} chữ chưa dịch]"
+                    if ch.untranslated_han else "")
+            typer.echo(f"{ch.index}\t[{ch.status.value}]\t{ch.translated_title or ch.title}{flag}")
     except NotFoundError as e:
         _fail(str(e))
 
@@ -161,6 +163,8 @@ def translate(
             notes.append(f"bước dự phòng {ch.chain_step}")
         if ch.possible_omission:
             notes.append("có thể sót đoạn")
+        if ch.untranslated_han:
+            notes.append(f"còn {ch.untranslated_han} chữ chưa dịch")
         extra = f" [{', '.join(notes)}]" if notes else ""
         typer.echo(f"✓ Chương {i}: {ch.translated_title} ({ch.provider}/{ch.model}){extra}")
 

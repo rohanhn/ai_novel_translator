@@ -17,7 +17,7 @@
 
 ## 4. API và CLI
 
-- [ ] 4.1 `ChapterSummary.untranslated_han`, `ChapterOut.untranslated_chars` (design D4); CLI `novel chapters` in cờ "còn N chữ chưa dịch". Kiểm tra bằng test API (danh sách có số đếm, chi tiết có tập chữ, chữ do glossary giữ không có trong tập) và test CLI (CliRunner).
+- [x] 4.1 `ChapterSummary.untranslated_han`, `ChapterOut.untranslated_chars` (design D4); CLI `novel chapters` in cờ "còn N chữ chưa dịch". Kiểm tra bằng test API (danh sách có số đếm, chi tiết có tập chữ, chữ do glossary giữ không có trong tập) và test CLI (CliRunner).
 
 ## 5. Web
 

@@ -68,6 +68,7 @@ class ChapterSummary(BaseModel):
     status: str
     glossary_outdated: bool
     possible_omission: bool
+    untranslated_han: int  # số chữ Hán còn sót trong bản dịch
     chain_step: int | None  # >1: dịch bằng model dự phòng
     job_lane: str | None = None  # có job đang chờ/chạy: foreground | background (prefetch)
 
@@ -75,7 +76,8 @@ class ChapterSummary(BaseModel):
     def of(cls, c: Chapter, job_lane: str | None = None) -> ChapterSummary:
         return cls(index=c.index, title=c.title, translated_title=c.translated_title,
                    status=c.status.value, glossary_outdated=c.glossary_outdated,
-                   possible_omission=c.possible_omission, chain_step=c.chain_step,
+                   possible_omission=c.possible_omission,
+                   untranslated_han=c.untranslated_han, chain_step=c.chain_step,
                    job_lane=job_lane)
 
 
@@ -85,12 +87,16 @@ class ChapterOut(ChapterSummary):
     provider: str | None
     model: str | None
     glossary_version: int | None
+    # chữ Hán còn sót (riêng biệt) để màn đọc tô sáng; tính theo bộ tên hiện tại
+    untranslated_chars: list[str] = []
 
     @classmethod
-    def of(cls, c: Chapter, job_lane: str | None = None) -> ChapterOut:
+    def of(cls, c: Chapter, job_lane: str | None = None,
+           untranslated_chars: tuple[str, ...] = ()) -> ChapterOut:
         return cls(**ChapterSummary.of(c, job_lane).model_dump(), source_text=c.source_text,
                    translated_text=c.translated_text, provider=c.provider, model=c.model,
-                   glossary_version=c.glossary_version)
+                   glossary_version=c.glossary_version,
+                   untranslated_chars=list(untranslated_chars))
 
 
 class ChapterEditIn(BaseModel):
