@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..domain import chapter_split
+from ..domain.han_residue import kept_chars, residue
 from ..domain.models import (
     IMPORT_PROVIDER,
     ChainPolicy,
@@ -71,16 +72,24 @@ class ImportResult:
         return len(self.plan.chapters)
 
 
-def new_chapter(novel: Novel, index: int, title: str, body: str) -> Chapter:
+def new_chapter(novel: Novel, index: int, title: str, body: str,
+                kept: frozenset[str] = frozenset()) -> Chapter:
     """Chương mới lấy từ file: `pending`, hoặc với truyện bản dịch có sẵn (`vi`) thì lưu luôn ở
-    trạng thái Đã dịch, không bao giờ qua LLM. Dùng chung cho import và cập nhật chương."""
+    trạng thái Đã dịch, không bao giờ qua LLM. Dùng chung cho import và cập nhật chương.
+    `kept`: chữ Hán do bộ tên giữ, không tính là chữ còn sót."""
     ch = Chapter(novel_id=novel.id, index=index, title=title, source_text=body)
     if novel.pretranslated:
         ch.translated_title, ch.translated_text = title, body
         ch.status = ChapterStatus.TRANSLATED
         ch.provider = IMPORT_PROVIDER
         ch.glossary_version = novel.glossary_version
+        ch.untranslated_han = residue(title, body, kept).count
     return ch
+
+
+def glossary_kept(repo: NovelRepository, novel_id: int) -> frozenset[str]:
+    """Chữ Hán có trong bản dịch bộ tên của truyện (không tính là chữ còn sót)."""
+    return kept_chars(g.target_term for g in repo.list_glossary(novel_id))
 
 
 class LibraryService:
@@ -358,6 +367,8 @@ class TranslationService:
         chapter.glossary_version = novel.glossary_version
         chapter.glossary_outdated = False
         chapter.possible_omission = out.possible_omission
+        chapter.untranslated_han = residue(
+            out.title, out.text, kept_chars(g.target_term for g in glossary)).count
         chapter.status = ChapterStatus.TRANSLATED
         self.repo.update_chapter(chapter)
         self._queue_suggestions(novel_id, glossary, out.names)
@@ -504,6 +515,8 @@ class EditingService:
         title = translated_title.strip() if translated_title else None
         chapter.translated_title = title or chapter.translated_title
         chapter.translated_text = text
+        chapter.untranslated_han = residue(
+            chapter.translated_title, text, glossary_kept(self.repo, novel_id)).count
         chapter.status = ChapterStatus.EDITED
         self.repo.update_chapter(chapter)
         return chapter

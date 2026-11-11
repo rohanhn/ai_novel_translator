@@ -158,6 +158,7 @@ def test_append_to_a_vietnamese_novel_makes_no_llm_request(container):
     new = container.repo.list_chapters(novel.id)[3:]
     assert all(c.status == ChapterStatus.TRANSLATED and c.provider == "import" for c in new)
     assert new[0].translated_text == new[0].source_text
+    assert all(c.untranslated_han == 0 for c in new)
     assert not container.jobs.has_jobs_for_novel(novel.id)
     assert container.quota.usage_today() == []
 
@@ -416,3 +417,29 @@ def test_file_with_only_missing_chapters_fills_the_gap(container, gappy):
     assert (res.new, res.kept, res.deleted) == (2, 5, 0)
     p = repo.get_progress(gappy.id)
     assert (p.chapter_index, p.position) == (6, 0.4)
+
+
+def test_replace_keeps_untranslated_count_of_reused_and_clears_changed(container, novel):
+    repo = container.repo
+    for idx, n in ((2, 4), (3, 2)):
+        ch = repo.get_chapter(novel.id, idx)
+        ch.untranslated_han = n
+        repo.update_chapter(ch)
+    d = draft_for(container, novel, zh_txt(range(1, 6), revised={3}))
+    apply_with_preview(container, d, "replace")
+    t = by_title(repo, novel.id)
+    assert t["第2章 标题2"].untranslated_han == 4  # tái dùng: giữ nguyên
+    assert t["第3章 标题3"].untranslated_han == 0  # nội dung đổi: mất bản dịch
+
+
+def test_vietnamese_update_counts_han_left_in_text(container):
+    body = "Trần Bình An ngồi trước cửa ngõ, nhìn mưa xuân rơi trên mái hiên. " * 3
+
+    def vi(ns, extra="") -> bytes:
+        return "\n".join(f"Chương {n}: Tên {n}\n{body}{n}{extra if n == 4 else ''}"
+                         for n in ns).encode()
+
+    novel = container.library.import_bytes(vi(range(1, 4)), "Kiếm Lai", "vi").novel
+    d = container.imports.create("moi.txt", vi(range(1, 5), extra=" 幽 lục"), novel_id=novel.id)
+    apply_with_preview(container, d, "append")
+    assert container.repo.get_chapter(novel.id, 4).untranslated_han == 1

@@ -335,4 +335,5 @@ class TranslationJobManager:
                 "status": ch.status.value, "title": ch.translated_title,
                 "provider": ch.provider, "model": ch.model, "chain_step": ch.chain_step,
                 "possible_omission": ch.possible_omission,
+                "untranslated_han": ch.untranslated_han,
             }))

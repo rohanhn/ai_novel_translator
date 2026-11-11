@@ -17,7 +17,13 @@ from ..domain.models import Chapter, ChapterStatus, Novel, ReadingProgress
 from ..domain.ports import NovelRepository
 from .imports import Draft, ImportDraftService
 from .jobs import Lane, TranslationJobManager
-from .services import InvalidOperationError, NotFoundError, NovelBusyError, new_chapter
+from .services import (
+    InvalidOperationError,
+    NotFoundError,
+    NovelBusyError,
+    glossary_kept,
+    new_chapter,
+)
 
 SUPPORTED_DETECTED = ("zh", "vi")
 _Kind = chapter_merge.EntryKind
@@ -184,7 +190,8 @@ class ChapterUpdateService:
         if plan.nothing_new:
             raise NothingNewError("File không có chương mới nào sau chương cuối của truyện.")
         last = max((c.index for c in chapters), default=0)
-        added = [new_chapter(novel, last + i, inc.title, inc.body)
+        kept = glossary_kept(self.repo, novel.id) if novel.pretranslated else frozenset()
+        added = [new_chapter(novel, last + i, inc.title, inc.body, kept)
                  for i, inc in enumerate(plan.to_add, start=1)]
         self.repo.add_chapters(added)
         return UpdateResult(novel, UpdateMode.APPEND, last + len(added), added=len(added))
@@ -231,6 +238,8 @@ class ChapterUpdateService:
             plan = preview.replace
             by_index = {c.index: c for c in chapters}
             result: list[Chapter] = []
+            kept = (glossary_kept(self.repo, preview.novel.id) if preview.novel.pretranslated
+                    else frozenset())
             for i, e in enumerate(plan.entries, start=1):
                 if e.kind in (_Kind.REUSE, _Kind.KEPT):
                     old = by_index[e.stored.index]
@@ -241,7 +250,8 @@ class ChapterUpdateService:
                         ch.status = ChapterStatus.PENDING  # không còn job nào đang dịch nó
                     result.append(ch)
                 else:  # CHANGED, NEW: nội dung mới, bỏ bản dịch cũ (kể cả bản sửa tay)
-                    result.append(new_chapter(preview.novel, i, e.incoming.title, e.incoming.body))
+                    result.append(new_chapter(preview.novel, i, e.incoming.title,
+                                              e.incoming.body, kept))
             with self.repo.unit_of_work():
                 self.repo.replace_chapters(preview.novel.id, result)
                 if preview.progress is not None:

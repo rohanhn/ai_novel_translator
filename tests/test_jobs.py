@@ -77,6 +77,8 @@ def test_completed_job_events_and_status(env):
     assert [e.data["index"] for e in evs if e.type == "paragraph"] == [1, 2, 3]
     assert evs[-1].data["status"] == "translated"
     assert repo.get_chapter(nid, 1).status == ChapterStatus.TRANSLATED
+    # bản dịch giả còn nguyên chữ Hán: 第一章 (3) + 一甲, 一乙, 一丙 (6)
+    assert evs[-1].data["untranslated_han"] == repo.get_chapter(nid, 1).untranslated_han == 9
     assert mgr.get(nid, 1) is None  # job xong thì rời registry
 
 
