@@ -32,7 +32,7 @@
 
 ## 6. Tài liệu và kiểm tra tích hợp
 
-- [ ] 6.1 Cập nhật `docs/ARCHITECTURE.md`: bảng lớp thêm `domain/han_residue.py`, ghi chú cờ `untranslated_han` cạnh `possible_omission`. Kiểm tra bằng `grep` tên module trong tài liệu.
+- [x] 6.1 Cập nhật `docs/ARCHITECTURE.md`: bảng lớp thêm `domain/han_residue.py`, ghi chú cờ `untranslated_han` cạnh `possible_omission`. Kiểm tra bằng `grep` tên module trong tài liệu.
 - [ ] 6.2 Chạy toàn bộ `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`, `cd web && npm run check && npm run check:contrast && npm run build && npm run test:e2e`, `openspec validate flag-untranslated-han --strict`. Kiểm tra tất cả pass.
 - [ ] 6.3 Thử trên app local với truyện "剑烛大荒" đã dịch bằng Gemini. Sau khi nâng cấp (migration), chương 2 có nhãn và đúng 72 chữ được tô; sửa tay hoặc dịch lại thì nhãn cập nhật đúng.
 
