@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import bisect
 import hashlib
+import itertools
 import re
 import unicodedata
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 from . import chapter_split
@@ -120,6 +121,9 @@ class AppendPlan:
     to_add: list[Incoming]
     warnings: list[MergeWarning]
     differing: list[StoredRef]  # chương trước điểm nối: cùng tiêu đề nhưng nội dung khác
+    # Chương trong file ngoài `to_add` mà truyện chưa có (chương thiếu ở giữa): chỉ báo, gợi ý
+    # dùng tải lại để chèn đúng chỗ.
+    middle: list[Incoming] = field(default_factory=list)
 
     @property
     def nothing_new(self) -> bool:
@@ -174,9 +178,29 @@ def _differing(stored: list[StoredRef], incoming: list[Incoming], keys: _Keys, b
     return [found[i] for i in sorted(found)]
 
 
+def _middle(stored: list[StoredRef], incoming: list[Incoming], keys: _Keys,
+            to_add: list[Incoming], keyer: Keyer) -> list[Incoming]:
+    """Chương trong file không nằm trong `to_add` và không khớp chương đang lưu nào (theo nội
+    dung hay tiêu đề)."""
+    adding = {i.position for i in to_add}
+    contents = {keyer.content(s.source_text) for s in stored}
+    titles = {keyer.title(s.title) for s in stored}
+    return [inc for i, inc in enumerate(incoming)
+            if inc.position not in adding and keys.content[i] not in contents
+            and keys.title[i] not in titles]
+
+
 def plan_append(stored: list[StoredRef], incoming: list[Incoming], start: int | None = None,
                 keyer: Keyer = DEFAULT_KEYER) -> AppendPlan:
     """Chương sẽ thêm vào cuối truyện. `start`: vị trí trong file do người dùng chọn."""
+    plan = _plan_append(stored, incoming, start, keyer)
+    if stored:
+        plan.middle = _middle(stored, incoming, _incoming_keys(incoming, keyer), plan.to_add, keyer)
+    return plan
+
+
+def _plan_append(stored: list[StoredRef], incoming: list[Incoming], start: int | None,
+                 keyer: Keyer) -> AppendPlan:
     stored = sorted(stored, key=lambda s: s.index)
     warnings: list[MergeWarning] = []
     keys = _incoming_keys(incoming, keyer)
@@ -342,4 +366,48 @@ def plan_replace(stored: list[StoredRef], incoming: list[Incoming], delete: set[
         kind = EntryKind.REUSE if i in content_matched else EntryKind.CHANGED
         entries.append(ReplaceEntry(kind, inc, s))
         emit_kept_after(s.index)
-    return ReplacePlan(entries, missing, deleted)
+    return ReplacePlan(_order_places_by_number(entries), missing, deleted)
+
+
+def _order_places_by_number(entries: list[ReplaceEntry]) -> list[ReplaceEntry]:
+    """Trong mỗi chỗ (giữa hai mục khớp liền nhau, hoặc trước/sau chúng), trộn chương giữ lại với
+    chương mới theo số chương: chương giữ lại đứng sau mọi chương mới có số nhỏ hơn. Chốt an
+    toàn: chương giữ lại không có số hoặc số không tăng dần thì giữ cách cũ (trước chương mới)."""
+    out: list[ReplaceEntry] = []
+    kept: list[ReplaceEntry] = []
+    new: list[ReplaceEntry] = []
+
+    def flush() -> None:
+        out.extend(_merge_place(kept, new))
+        kept.clear()
+        new.clear()
+
+    for e in entries:
+        if e.kind is EntryKind.KEPT:
+            kept.append(e)
+        elif e.kind is EntryKind.NEW:
+            new.append(e)
+        else:
+            flush()
+            out.append(e)
+    flush()
+    return out
+
+
+def _merge_place(kept: list[ReplaceEntry], new: list[ReplaceEntry]) -> list[ReplaceEntry]:
+    if not kept or not new:
+        return kept + new
+    kept_nums = [title_number(e.stored.title) for e in kept]
+    if any(n is None for n in kept_nums) or any(a >= b for a, b in itertools.pairwise(kept_nums)):
+        return kept + new
+    new_nums = [_number_of(e.incoming) for e in new]
+    out: list[ReplaceEntry] = []
+    taken = 0  # số chương mới đã đặt
+    for e, n in zip(kept, kept_nums, strict=True):
+        after = max((j + 1 for j, m in enumerate(new_nums) if m is not None and m < n), default=0)
+        if after > taken:
+            out.extend(new[taken:after])
+            taken = after
+        out.append(e)
+    out.extend(new[taken:])
+    return out

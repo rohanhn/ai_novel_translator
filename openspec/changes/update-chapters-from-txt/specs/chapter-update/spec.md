@@ -122,8 +122,8 @@ In `replace` mode, if a kept chapter in a place has no readable chapter number, 
 - **THEN** they stay right after the preceding matched chapter, before the new chapters of that place
 
 #### Scenario: Numbering restarts per volume
-- **WHEN** the kept chapters in a place are numbered 1, 2, 3 after chapters numbered 98, 99
-- **THEN** the numbers are not increasing, so the kept chapters stay right after the preceding matched chapter, before the new chapters of that place
+- **WHEN** the kept chapters in a place are numbered 99 then 1, because numbering restarts in the next volume, and the place also holds a new chapter numbered 50
+- **THEN** the kept chapters' numbers are not increasing, so both kept chapters stay right after the preceding matched chapter, before the new chapter
 
 ### Requirement: Replace reuses unchanged translations
 In `replace` mode, a file chapter that content-matches a stored chapter SHALL keep that chapter's translated title and text, status, provider, model, glossary version and flags, including chapters in status `edited`. No translation request is made for it.

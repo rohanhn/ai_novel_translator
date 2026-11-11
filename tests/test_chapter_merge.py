@@ -190,6 +190,32 @@ def test_differing_ignores_chapters_after_anchor():
     assert plan.differing == []
 
 
+def stored_numbers(*numbers: int) -> list[cm.StoredRef]:
+    """Chương đang lưu có số chương `numbers`, index 1..n (truyện bị thiếu chương ở giữa)."""
+    return [cm.StoredRef(i, zh_title(n), f"正文{n}。", "translated")
+            for i, n in enumerate(numbers, start=1)]
+
+
+def test_file_has_chapters_missing_from_the_middle_of_the_novel():
+    plan = cm.plan_append(stored_numbers(1, 2, 3, 6, 7), incoming(*range(1, 9)))
+    assert plan.anchor.stored_index == 5
+    assert positions(plan.to_add) == [8]
+    assert [c.title for c in plan.middle] == [zh_title(4), zh_title(5)]
+
+
+def test_middle_lists_unplaced_chapters_when_start_is_needed():
+    plan = cm.plan_append(stored_numbers(1, 2, 3, 6, 7), incoming(4, 5))
+    assert plan.needs_start and plan.to_add == []
+    assert positions(plan.middle) == [1, 2]
+
+
+def test_middle_excludes_chapters_to_add_and_matched_chapters():
+    plan = cm.plan_append(stored_range(1, 3), incoming(1, (zh_title(2), "改过的。"), 3, 4))
+    assert positions(plan.to_add) == [4]
+    assert plan.middle == []  # chương 2 khớp tiêu đề (differing), không phải chương thiếu
+    assert cm.plan_append([], incoming(1, 2)).middle == []
+
+
 # --- Replace ----------------------------------------------------------------------------------
 
 
@@ -257,6 +283,49 @@ def test_kept_chapter_at_start_and_consecutive_kept():
         cm.StoredRef(5, "后记A", "a"), cm.StoredRef(6, "后记B", "b")]
     plan = cm.plan_replace(stored, incoming(1, 2, 3))
     assert layout(plan) == ["kept:1", "kept:2", "reuse:3", "reuse:4", "kept:5", "kept:6", "new@3"]
+
+
+def test_file_contains_only_the_missing_chapters():
+    plan = cm.plan_replace(stored_numbers(1, 2, 3, 6, 7), incoming(4, 5))
+    assert layout(plan) == ["kept:1", "kept:2", "kept:3", "new@1", "new@2", "kept:4", "kept:5"]
+    assert plan.count(cm.EntryKind.NEW) == 2 and plan.deleted == []
+
+
+def test_partial_file_around_the_gap():
+    plan = cm.plan_replace(stored_numbers(1, 2, 3, 6, 7), incoming(3, 4, 5, 6))
+    assert layout(plan) == ["kept:1", "kept:2", "reuse:3", "new@2", "new@3", "reuse:4", "kept:5"]
+
+
+def test_missing_chapters_filled_after_the_last_match():
+    plan = cm.plan_replace(stored_numbers(1, 2, 5, 6), incoming(1, 3, 4))
+    assert layout(plan) == ["reuse:1", "kept:2", "new@2", "new@3", "kept:3", "kept:4"]
+
+
+def test_kept_chapters_without_numbers_stay_before_new_chapters():
+    stored = [cm.StoredRef(1, zh_title(1), "正文1。"), cm.StoredRef(2, "公告", "公告内容"),
+              cm.StoredRef(3, "后记", "后记内容")]
+    plan = cm.plan_replace(stored, incoming(1, 2, 3))
+    assert layout(plan) == ["reuse:1", "kept:2", "kept:3", "new@2", "new@3"]
+
+
+def test_numbering_restarts_per_volume_keeps_old_placement():
+    # Chỗ sau chương 1: giữ lại 99 rồi 1 (quyển sau đánh lại số) và chương mới 50.
+    stored = [cm.StoredRef(1, zh_title(1), "正文1。"), cm.StoredRef(2, zh_title(99), "卷一99"),
+              cm.StoredRef(3, zh_title(1), "卷二1")]
+    plan = cm.plan_replace(stored, incoming(1, (zh_title(50), "新的50")))
+    assert layout(plan) == ["reuse:1", "kept:2", "kept:3", "new@2"]
+
+
+def test_kept_numbers_increasing_are_merged_with_new():
+    stored = stored_numbers(1) + [cm.StoredRef(2, zh_title(3), "正文3。"),
+                                  cm.StoredRef(3, zh_title(5), "正文5。")]
+    plan = cm.plan_replace(stored, incoming(1, 2, 4))
+    assert layout(plan) == ["reuse:1", "new@2", "kept:2", "new@3", "kept:3"]
+
+
+def test_reading_progress_follows_kept_chapter_after_fill():
+    plan = cm.plan_replace(stored_numbers(1, 2, 3, 6, 7), incoming(4, 5))
+    assert plan.remap_progress(4, 0.4) == (6, 0.4)  # đang đọc chương 6 (index cũ 4)
 
 
 def test_kept_chapter_follows_predecessor_moved_elsewhere():
