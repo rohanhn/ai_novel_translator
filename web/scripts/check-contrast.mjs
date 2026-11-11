@@ -22,7 +22,8 @@ const PAIRS = [
 	['edited-fg', 'edited-bg'],
 	['warn-fg', 'warn-bg'],
 	['danger-fg', 'danger-bg'],
-	['info-fg', 'info-bg']
+	['info-fg', 'info-bg'],
+	['residue-fg', 'residue-bg']
 ];
 
 function tokens(theme) {

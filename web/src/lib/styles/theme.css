@@ -33,6 +33,9 @@
 	--warn-fg: #5c4a10;
 	--warn-bg: #fbf1d8;
 	--warn-line: #e0c88f;
+	/* chữ Hán còn sót trong bản dịch (tô sáng khi đọc) */
+	--residue-fg: #7a1f14;
+	--residue-bg: #f6dcd4;
 	--danger-fg: #8a2418;
 	--danger-bg: #fbedea;
 	--danger-line: #e2b5ac;
@@ -71,6 +74,9 @@
 	--warn-fg: #57440c;
 	--warn-bg: #f6e6be;
 	--warn-line: #d8bd7c;
+	/* chữ Hán còn sót trong bản dịch (tô sáng khi đọc) */
+	--residue-fg: #6f1c12;
+	--residue-bg: #efd0c0;
 	--danger-fg: #7f2015;
 	--danger-bg: #f6e1d6;
 	--danger-line: #ddae9c;
@@ -109,6 +115,9 @@
 	--warn-fg: #e6c77d;
 	--warn-bg: #2e2716;
 	--warn-line: #5f4f26;
+	/* chữ Hán còn sót trong bản dịch (tô sáng khi đọc) */
+	--residue-fg: #f2b8aa;
+	--residue-bg: #4a2620;
 	--danger-fg: #f0a092;
 	--danger-bg: #351c18;
 	--danger-line: #6b3329;
@@ -147,6 +156,9 @@
 	--warn-fg: #574710;
 	--warn-bg: #f1ebc9;
 	--warn-line: #d3c27f;
+	/* chữ Hán còn sót trong bản dịch (tô sáng khi đọc) */
+	--residue-fg: #7a2218;
+	--residue-bg: #f2dcd2;
 	--danger-fg: #842519;
 	--danger-bg: #f5e3dc;
 	--danger-line: #ddb0a4;

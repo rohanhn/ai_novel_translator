@@ -6,6 +6,7 @@
 	import Modal from '#lib/components/Modal.svelte';
 	import ChapterEditor from '#lib/reader/ChapterEditor.svelte';
 	import ReaderPanel from '#lib/reader/ReaderPanel.svelte';
+	import { splitHan } from '#lib/reader/highlight.js';
 	import { failureReason, followTranslation, formatReset } from '#lib/reader/stream.js';
 	import { ChapterTracker, decisionText, leaveNovel, saveProgress, scrollToRatio } from '#lib/reader/tracker.js';
 	import type { Progress } from '#lib/types.js';
@@ -50,6 +51,8 @@
 	);
 	const sourceParas = $derived(chapter ? chapter.source_text.split('\n').filter((p) => p.trim()) : []);
 	const viTitle = $derived(hasTranslation ? chapter!.translated_title : streamTitle);
+	// Chữ Hán còn sót cần tô (chỉ với bản dịch đã lưu; lúc đang stream không tô).
+	const residue = $derived(new Set(hasTranslation ? (chapter!.untranslated_chars ?? []) : []));
 
 	function detach() {
 		stop?.();
@@ -246,7 +249,7 @@
 		{:else if chapter}
 			<div class="heading">
 				{#if !pretranslated}<span class="cn" lang="zh">{chapter.title}</span>{/if}
-				{#if !showSource && viTitle}<h1>{viTitle}</h1>{/if}
+				{#if !showSource && viTitle}<h1>{#each splitHan(viTitle, residue) as piece, k (k)}{#if piece.mark}<mark class="han-residue">{piece.text}</mark>{:else}{piece.text}{/if}{/each}</h1>{/if}
 				<svg class="cloud" aria-hidden="true" width="120" height="14" viewBox="0 0 120 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"
 					><path d="M0 7h44M76 7h44" /><path d="M48 9c2-4 6-4 7-1 1-3 6-4 7 0 2-3 6-3 7 1" /></svg
 				>
@@ -284,6 +287,12 @@
 							<p class="notice notice-warn">
 								Có thể thiếu đoạn so với bản gốc.
 								<button class="link" onclick={() => (showSource = true)}>Xem bản gốc</button>
+							</p>
+						{/if}
+						{#if chapter.untranslated_han > 0}
+							<p class="notice notice-warn" data-testid="untranslated-notice">
+								Còn {chapter.untranslated_han} chữ chưa dịch (được tô sáng trong bài).
+								<button class="link" onclick={() => translate({ force: true })}>Dịch lại</button>
 							</p>
 						{/if}
 					</div>
@@ -326,7 +335,7 @@
 					</div>
 				{/if}
 
-				{#each paragraphs as p, i (i)}<p class="para">{p}</p>{/each}
+				{#each paragraphs as p, i (i)}<p class="para">{#each splitHan(p, residue) as piece, k (k)}{#if piece.mark}<mark class="han-residue">{piece.text}</mark>{:else}{piece.text}{/if}{/each}</p>{/each}
 				{#if phase.kind === 'streaming'}
 					<div class="skeleton" aria-hidden="true"><div></div><div></div><div></div></div>
 				{/if}
@@ -465,6 +474,14 @@
 	.cloud {
 		color: var(--bronze);
 		margin-top: 4px;
+	}
+	.han-residue {
+		color: var(--residue-fg);
+		background: var(--residue-bg);
+		text-decoration: underline wavy var(--residue-fg);
+		text-decoration-thickness: 1px;
+		text-underline-offset: 3px;
+		padding: 0 1px;
 	}
 	.para {
 		margin: 0 0 0.9em;

@@ -8,7 +8,8 @@ export type ChipKind =
 	| 'failed'
 	| 'glossary_outdated'
 	| 'fallback'
-	| 'possible_omission';
+	| 'possible_omission'
+	| 'untranslated_han';
 
 export const CHIP_LABELS: Record<ChipKind, string> = {
 	pending: 'Chưa dịch',
@@ -19,13 +20,15 @@ export const CHIP_LABELS: Record<ChipKind, string> = {
 	failed: 'Lỗi',
 	glossary_outdated: 'Bộ tên đã đổi',
 	fallback: 'Model dự phòng',
-	possible_omission: 'Có thể thiếu đoạn'
+	possible_omission: 'Có thể thiếu đoạn',
+	untranslated_han: 'Còn chữ chưa dịch'
 };
 
 export type ChapterFlags = {
 	status: string;
 	glossary_outdated?: boolean;
 	possible_omission?: boolean;
+	untranslated_han?: number;
 	chain_step?: number | null;
 	job_lane?: string | null;
 };
@@ -41,5 +44,6 @@ export function chipsFor(ch: ChapterFlags): ChipKind[] {
 	if (ch.chain_step != null && ch.chain_step > 1) kinds.push('fallback');
 	if (ch.glossary_outdated) kinds.push('glossary_outdated');
 	if (ch.possible_omission) kinds.push('possible_omission');
+	if (ch.untranslated_han) kinds.push('untranslated_han');
 	return kinds;
 }

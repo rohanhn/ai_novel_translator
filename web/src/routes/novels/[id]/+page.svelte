@@ -37,7 +37,7 @@
 
 	const isDone = (c: ChapterSummary) => c.status === 'translated' || c.status === 'edited';
 	const needsReview = (c: ChapterSummary) =>
-		c.glossary_outdated || c.possible_omission || (c.chain_step ?? 1) > 1;
+		c.glossary_outdated || c.possible_omission || c.untranslated_han > 0 || (c.chain_step ?? 1) > 1;
 
 	const counts = $derived({
 		all: chapters?.length ?? 0,

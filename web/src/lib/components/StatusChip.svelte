@@ -11,7 +11,8 @@
 		failed: 'danger',
 		glossary_outdated: 'warn',
 		fallback: 'warn',
-		possible_omission: 'warn'
+		possible_omission: 'warn',
+		untranslated_han: 'warn'
 	};
 </script>
 
