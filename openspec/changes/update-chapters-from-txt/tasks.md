@@ -55,7 +55,7 @@
 ## 6. Kiểm tra tích hợp
 
 - [x] 6.1 Chạy toàn bộ `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`, `cd web && npm run check && npm run check:contrast && npm run build && npm run test:e2e`, `openspec validate update-chapters-from-txt --strict`. Kiểm tra tất cả pass.
-- [ ] 6.2 Làm sau mục 7. Thử trên app local (`NT_PROVIDER=echo`) với một truyện thật nhiều chương của người dùng:
+- [x] 6.2 Làm sau mục 7. Thử trên app local (`NT_PROVIDER=echo`) với một truyện thật nhiều chương của người dùng:
   - thêm từ file tải lại cả bộ, và từ file chỉ có chương mới;
   - tải lại với file đã sửa vài chương;
   - bổ sung chương thiếu ở giữa: thêm thì thấy thông báo chương thiếu; tải lại với file chỉ chứa các chương thiếu thì chương được chèn đúng thứ tự.
