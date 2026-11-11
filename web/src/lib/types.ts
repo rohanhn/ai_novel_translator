@@ -100,9 +100,11 @@ export type UpdatePreview = {
 	nothing_new: boolean;
 	to_add: FileChapterRef[];
 	differing: StoredChapterRef[];
+	middle: FileChapterRef[];
 	counts: { reuse: number; changed: number; new: number; missing: number } | null;
 	changed: StoredChapterRef[];
 	missing: StoredChapterRef[];
+	new: (FileChapterRef & { index: number })[];
 	edited_lost: StoredChapterRef[];
 	progress: ProgressMove | null;
 };

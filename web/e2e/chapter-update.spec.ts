@@ -108,3 +108,50 @@ test('huỷ cập nhật: không đổi gì', async ({ page }, info) => {
 	await expect(page.getByRole('dialog')).toHaveCount(0);
 	expect((await chapters(page, id)).length).toBe(2);
 });
+
+test('bổ sung chương thiếu ở giữa: thêm chỉ báo, tải lại chèn đúng thứ tự', async ({ page }, info) => {
+	await login(page);
+	// Truyện thiếu chương 4, 5 (đang có 1, 2, 3, 6, 7).
+	const r = await page.request.post('/api/novels', {
+		headers: { 'X-Requested-With': 'e2e' },
+		multipart: {
+			file: {
+				name: `thieu-${info.project.name}.txt`,
+				mimeType: 'text/plain',
+				buffer: Buffer.from(novelText([1, 2, 3, 6, 7], 8, [], true))
+			}
+		}
+	});
+	expect(r.status()).toBe(201);
+	const id = (await r.json()).id as number;
+	await translateViaApi(page, id, 4); // chương 6
+
+	// Thêm chương mới với file cả bộ: chỉ thêm chương 8, báo chương 4, 5 nằm giữa.
+	let dialog = await openChanges(page, id, novelText([1, 2, 3, 4, 5, 6, 7, 8], 8, [], true));
+	await dialog.getByText('Thêm chương mới', { exact: true }).click();
+	await expect(dialog.getByText(/\+1\s+chương mới/)).toBeVisible();
+	await expect(dialog.getByTestId('middle-notice')).toContainText('File có 2 chương truyện chưa có');
+	await dialog.getByRole('button', { name: 'Huỷ' }).click();
+
+	// Tải lại với file chỉ có chương 4, 5: chèn đúng chỗ, chương cũ giữ bản dịch.
+	dialog = await openChanges(page, id, novelText([4, 5], 8, [], true));
+	await dialog.getByText('Tải lại cả bộ', { exact: true }).click();
+	const positions = dialog.getByTestId('new-positions');
+	await expect(positions).toContainText('第4章 标题4 → chương 4');
+	await expect(positions).toContainText('第5章 标题5 → chương 5');
+	await expectNoHorizontalScroll(page);
+	await shot(page, info, 'update-fill-middle');
+	await dialog.getByRole('button', { name: 'Xác nhận tải lại' }).click();
+	await expect(page.getByRole('dialog')).toHaveCount(0);
+	await expect(page.locator('ol.rows > li')).toHaveCount(7);
+	const chs = await chapters(page, id);
+	expect(chs.map((c) => [c.title, c.status])).toEqual([
+		['第1章 标题1', 'pending'],
+		['第2章 标题2', 'pending'],
+		['第3章 标题3', 'pending'],
+		['第4章 标题4', 'pending'],
+		['第5章 标题5', 'pending'],
+		['第6章 标题6', 'translated'],
+		['第7章 标题7', 'pending']
+	]);
+});

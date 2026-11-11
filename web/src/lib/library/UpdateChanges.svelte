@@ -207,6 +207,25 @@
 						Thêm chương mới không đổi các chương này; chọn “Tải lại cả bộ” nếu muốn cập nhật chúng.
 					</p>
 				{/if}
+
+				{#if changes.middle.length}
+					<div class="notice notice-warn" data-testid="middle-notice">
+						<p>
+							File có {fmt(changes.middle.length)} chương truyện chưa có, nằm ở giữa (vd. “{changes.middle[0].title}”).
+							Thêm chương mới không chèn các chương này; chọn “Tải lại cả bộ” để chèn đúng chỗ.
+						</p>
+						{#if changes.middle.length > 1}
+							<details>
+								<summary>Xem {fmt(changes.middle.length)} chương</summary>
+								<ol class="list">
+									{#each changes.middle.slice(0, LIST_LIMIT) as m (m.position)}
+										<li>{m.title}</li>
+									{/each}
+								</ol>
+							</details>
+						{/if}
+					</div>
+				{/if}
 			</section>
 		{:else if changes.counts}
 			{@const c = changes.counts}
@@ -240,12 +259,26 @@
 					</details>
 				{/if}
 
+				{#if changes.new.length}
+					<details open={changes.new.length <= 20}>
+						<summary>Vị trí {fmt(changes.new.length)} chương mới</summary>
+						<ol class="list" data-testid="new-positions">
+							{#each changes.new.slice(0, LIST_LIMIT) as n (n.position)}
+								<li>{n.title} → chương {n.index}</li>
+							{/each}
+							{#if changes.new.length > LIST_LIMIT}
+								<li class="hint">… và {fmt(changes.new.length - LIST_LIMIT)} chương nữa</li>
+							{/if}
+						</ol>
+					</details>
+				{/if}
+
 				{#if changes.missing.length}
 					<fieldset class="missing">
 						<legend>Chương không còn trong file</legend>
 						<p class="hint">
-							Chương không chọn sẽ được giữ (cùng bản dịch), đặt ngay sau chương đứng trước nó. Chương được
-							chọn sẽ bị xoá cùng bản dịch.
+							Chương không chọn sẽ được giữ (cùng bản dịch) ở chỗ cũ, xếp theo số chương với các chương mới.
+							Chương được chọn sẽ bị xoá cùng bản dịch.
 						</p>
 						<label class="check all">
 							<input type="checkbox" checked={allSelected} disabled={busy} onchange={(e) => setAll(e.currentTarget.checked)} />
@@ -409,6 +442,9 @@
 		margin: 2px 0 0;
 		font-size: 20px;
 		font-weight: 600;
+	}
+	.notice p {
+		margin: 0;
 	}
 	.notice ul {
 		margin: 6px 0 0;
