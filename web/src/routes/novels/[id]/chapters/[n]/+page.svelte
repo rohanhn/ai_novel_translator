@@ -292,7 +292,7 @@
 						{#if chapter.untranslated_han > 0}
 							<p class="notice notice-warn" data-testid="untranslated-notice">
 								Còn {chapter.untranslated_han} chữ chưa dịch (được tô sáng trong bài).
-								<button class="link" onclick={() => translate({ force: true })}>Dịch lại</button>
+								<button class="link tap" onclick={() => translate({ force: true })}>Dịch lại</button>
 							</p>
 						{/if}
 					</div>
@@ -500,6 +500,9 @@
 		font-size: 13px;
 		line-height: 1.45;
 		margin-bottom: 14px;
+	}
+	.link.tap {
+		min-height: var(--touch);
 	}
 	.link {
 		min-height: 32px;

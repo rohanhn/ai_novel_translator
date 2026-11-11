@@ -8,7 +8,9 @@ test('mục lục: nhãn trạng thái bằng chữ thường, lọc, đọc ti�
 	await expect(page.getByRole('link', { name: /Danh Lục · Bộ tên/ })).toContainText('2');
 
 	const row = (n: number) => page.locator('.row').nth(n - 1);
-	await expect(row(1).locator('.chips')).toHaveText('Đã dịch');
+	// bản dịch echo giữ nguyên chữ Hán nên chương đã dịch có thêm nhãn "Còn chữ chưa dịch"
+	await expect(row(1).locator('.chips')).toContainText('Đã dịch');
+	await expect(row(1).locator('.chips')).toContainText('Còn chữ chưa dịch');
 	await expect(row(2).locator('.chips')).toContainText('Model dự phòng');
 	await expect(row(3).locator('.chips')).toContainText('Đã biên tập');
 	await expect(row(3).locator('.chips')).toContainText('Bộ tên đã đổi');
@@ -23,8 +25,8 @@ test('mục lục: nhãn trạng thái bằng chữ thường, lọc, đọc ti�
 	await expectTouchTargets(page);
 	await shot(page, info, 'novel');
 
-	await page.getByRole('button', { name: 'Cần xem lại · 3' }).click();
-	await expect(page.locator('.row')).toHaveCount(3);
+	await page.getByRole('button', { name: 'Cần xem lại · 4' }).click(); // chương 1 còn chữ Hán (echo)
+	await expect(page.locator('.row')).toHaveCount(4);
 	await page.getByRole('button', { name: 'Lỗi · 1' }).click();
 	await expect(page.locator('.row')).toHaveCount(1);
 	await page.getByRole('button', { name: 'Đã dịch · 4' }).click();

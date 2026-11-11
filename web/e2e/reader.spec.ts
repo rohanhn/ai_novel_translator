@@ -16,8 +16,9 @@ test('chương đã dịch hiển thị ngay, không gọi dịch; xem bản g�
 	);
 	await login(page, '/novels/1/chapters/2');
 	await expect(page.locator('.para').first()).toContainText('[VI]');
-	await expect(page.getByText(/Dịch bằng model dự phòng \(bước 2/)).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Dịch lại' })).toBeVisible();
+	const fallback = page.locator('.notice', { hasText: /Dịch bằng model dự phòng \(bước 2/ });
+	await expect(fallback).toBeVisible();
+	await expect(fallback.getByRole('button', { name: 'Dịch lại' })).toBeVisible();
 	expect(posts).toEqual([]);
 	await expectNoHorizontalScroll(page);
 	await expectTouchTargets(page, 'header button, header a, footer a, footer button');

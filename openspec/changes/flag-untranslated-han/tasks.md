@@ -22,7 +22,7 @@
 ## 5. Web
 
 - [x] 5.1 `lib/reader/highlight.ts` (`splitHan`), nhãn `untranslated_han` trong `status.ts` và bộ lọc "có vấn đề", thông báo kèm "Dịch lại" và tô sáng trên màn đọc, cặp màu tô sáng trong `check:contrast` (design D5). Kiểm tra `npm run check` và `npm run check:contrast` pass.
-- [ ] 5.2 Playwright `web/e2e/untranslated-han.spec.ts` (mobile 360px và desktop), provider `echo`. Đặt bản dịch có chữ Hán qua API sửa tay (sửa tay cũng tính số đếm), rồi kiểm tra:
+- [x] 5.2 Playwright `web/e2e/untranslated-han.spec.ts` (mobile 360px và desktop), provider `echo`. Đặt bản dịch có chữ Hán qua API sửa tay (sửa tay cũng tính số đếm), rồi kiểm tra:
   - mục lục có nhãn "Còn chữ chưa dịch";
   - màn đọc có thông báo kèm số chữ, và `mark.han-residue` bao đúng các chữ Hán;
   - sửa lại không còn chữ Hán thì nhãn và tô sáng biến mất;
