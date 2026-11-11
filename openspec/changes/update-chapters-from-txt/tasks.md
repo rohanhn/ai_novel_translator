@@ -55,11 +55,19 @@
 ## 6. Kiểm tra tích hợp
 
 - [x] 6.1 Chạy toàn bộ `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`, `cd web && npm run check && npm run check:contrast && npm run build && npm run test:e2e`, `openspec validate update-chapters-from-txt --strict`. Kiểm tra tất cả pass.
-- [ ] 6.2 Thử trên app local (`NT_PROVIDER=echo`) với một truyện thật nhiều chương của người dùng:
+- [ ] 6.2 Làm sau mục 7. Thử trên app local (`NT_PROVIDER=echo`) với một truyện thật nhiều chương của người dùng:
   - thêm từ file tải lại cả bộ, và từ file chỉ có chương mới;
-  - tải lại với file đã sửa vài chương.
+  - tải lại với file đã sửa vài chương;
+  - bổ sung chương thiếu ở giữa: thêm thì thấy thông báo chương thiếu; tải lại với file chỉ chứa các chương thiếu thì chương được chèn đúng thứ tự.
 
   Kiểm tra số chương, bản dịch được giữ, tiến độ đọc và glossary đúng như màn xem trước, và thời gian áp tải lại với truyện lớn nhất dưới 10 giây.
+
+## 7. Bổ sung chương thiếu nằm giữa
+
+- [ ] 7.1 Domain (design D1): `plan_replace` trộn chương `kept` với mục `new` theo số chương trong từng chỗ, kèm chốt an toàn; `plan_append` trả `middle`. Kiểm tra bằng `tests/test_chapter_merge.py` theo các scenario "File contains only the missing chapters", "Partial file around the gap", "Kept chapters without numbers", "Numbering restarts per volume" và "File has chapters missing from the middle of the novel"; các test cũ của `plan_replace`/`plan_append` vẫn pass, test hiệu năng 2000 chương vẫn dưới 2 giây.
+- [ ] 7.2 Service, API và schema (design D5): `UpdatePreview` thêm `middle[{position, title}]` cho append và `new[{position, title, index}]` cho replace. Kiểm tra bằng `tests/test_chapter_update.py` và `tests/test_api_chapter_update.py` theo scenario "Replace preview shows where new chapters go" và tiến độ đọc trỏ đúng chương sau khi chèn giữa.
+- [ ] 7.3 Web (design D6): thông báo `middle` ở chế độ Thêm; danh sách chương mới kèm vị trí ở chế độ Tải lại. Thêm ca vào `web/e2e/chapter-update.spec.ts`: file chỉ có chương thiếu, chọn Tải lại, mục lục đúng thứ tự và chương cũ còn bản dịch. Kiểm tra `npm run check`, `npm run check:contrast`, `npm run build && npm run test:e2e` pass.
+- [ ] 7.4 Chạy lại toàn bộ kiểm tra như 6.1 và `openspec validate update-chapters-from-txt --strict`. Kiểm tra tất cả pass.
 
 ## Workflow follow-up
 

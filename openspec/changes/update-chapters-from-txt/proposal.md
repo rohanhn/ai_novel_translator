@@ -7,12 +7,13 @@ Truyện dài liên tục ra chương mới, nhưng hiện mọi lần import TX
 ## What Changes
 
 - Thêm luồng **Cập nhật từ TXT** trên trang truyện. Luồng dùng lại bước upload và xem trước cách tách chương của import thông minh, rồi bắt người dùng **chọn một trong hai chế độ**, không có mặc định:
-  - **Thêm chương**: tìm *điểm nối* là chương cuối của truyện trong file mới. Không thấy thì lùi tối đa 5 chương cuối. Vẫn không thấy thì xét số chương: liên tiếp thì nối toàn bộ, có khoảng trống thì cảnh báo, không đọc được số thì người dùng tự chọn chương bắt đầu. Chỉ các chương sau điểm nối được thêm, với số thứ tự nối tiếp. Chương cũ không bị đụng tới.
+  - **Thêm chương**: tìm *điểm nối* là chương cuối của truyện trong file mới. Không thấy thì lùi tối đa 5 chương cuối. Vẫn không thấy thì xét số chương: liên tiếp thì nối toàn bộ, có khoảng trống thì cảnh báo, không đọc được số thì người dùng tự chọn chương bắt đầu. Chỉ các chương sau điểm nối được thêm, với số thứ tự nối tiếp. Chương cũ không bị đụng tới. Chương trong file mà truyện chưa có nhưng không nằm sau điểm nối (chương thiếu ở giữa) chỉ được báo, kèm gợi ý dùng Tải lại.
   - **Tải lại cả bộ**: thứ tự chương lấy theo file mới. Mỗi chương mới được so với chương cũ:
     - nội dung gốc giống nhau → **tái dùng** bản dịch, trạng thái và cờ, kể cả bản đã sửa tay;
     - cùng tiêu đề nhưng nội dung gốc đã đổi → **bỏ bản dịch cũ, kể cả bản sửa tay**, chuyển `pending`;
     - không khớp → chương mới `pending`.
   - Chương cũ không còn trong file: người dùng **chọn từng chương để xóa** (mặc định không chọn, có "chọn tất cả"). Chương không xóa được giữ ngay sau chương khớp đứng trước nó.
+  - Chương mới và chương cũ được giữ nằm cùng một chỗ (giữa hai chương khớp) thì xếp theo số chương. Nhờ vậy file chỉ chứa các chương còn thiếu vẫn được chèn đúng chỗ.
 - Màn **xem trước thay đổi** cho biết số chương thêm, giữ, đổi và có thể xóa, số bản sửa tay sẽ mất, và tiến độ đọc sẽ chuyển sang đâu. Chỉ khi người dùng xác nhận mới ghi, và ghi trong một transaction.
 - Giữ nguyên khi cập nhật: tên, tác giả, giới thiệu, bìa, glossary, đề xuất glossary. Tiến độ đọc được chuyển theo chương khớp.
 - Chặn cập nhật khi:

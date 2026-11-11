@@ -44,7 +44,7 @@ Incoming(position, title, body, heading_number)   # chương trong file (từ Sp
 1. `start` do người dùng chọn thì dùng luôn.
 2. Không có `start`: với `k` từ chương cuối lùi tối đa 5 chương, tìm **lần xuất hiện cuối** trong file của `stored[k]`. Thứ tự ưu tiên: trùng cả nội dung lẫn tiêu đề, rồi trùng nội dung, rồi trùng tiêu đề. Thấy thì điểm nối là vị trí đó. Mức đầu giúp các chương có thân giống hệt nhau (thông báo, dữ liệu mẫu) không neo nhầm vào lần xuất hiện cuối của một chương khác.
 3. Không thấy neo: xét `heading_number` của chương có số đầu tiên trong file, so với số của chương cuối đang lưu (đọc từ `title_key`). Bằng số cuối + 1 thì nối từ đầu file. Lớn hơn thì cũng nối từ đầu file, kèm cảnh báo `gap` có danh sách số bị thiếu. Còn lại thì trả `needs_start`.
-4. Trả về: `anchor` (index đang lưu, vị trí trong file, loại khớp, hoặc `None`), `to_add` (danh sách vị trí trong file), `warnings`, và `differing` (các chương trước neo chỉ khớp tiêu đề, để hiện thông báo gợi ý dùng tải lại).
+4. Trả về: `anchor` (index đang lưu, vị trí trong file, loại khớp, hoặc `None`), `to_add` (danh sách vị trí trong file), `warnings`, `differing` (các chương trước neo chỉ khớp tiêu đề, để hiện thông báo gợi ý dùng tải lại), và `middle` (các chương trong file nằm ngoài `to_add` mà không khớp chương nào đang lưu theo nội dung hay tiêu đề, tức chương thiếu ở giữa; chỉ để báo, gợi ý dùng tải lại).
 
 **`plan_replace(stored, incoming, delete: set[int]) -> ReplacePlan`:**
 1. **Lượt 1 (khớp nội dung):** trước hết ghép theo cặp (nội dung, tiêu đề), sau đó mới ghép theo riêng nội dung. Map `content_key → [stored index]`. Duyệt file theo thứ tự, lấy chương lưu chưa dùng nhỏ nhất **lớn hơn chương lưu vừa khớp trước đó**. Không có thì lấy chương chưa dùng nhỏ nhất. Cách này giữ đúng thứ tự khi có chương trùng nội dung, ví dụ hai chương "请假条".
@@ -54,6 +54,9 @@ Incoming(position, title, body, heading_number)   # chương trong file (từ Sp
    - `changed(old)` khi chỉ khớp tiêu đề,
    - `new` khi không khớp.
 4. Chương lưu không được dùng là `missing`. Chương có index trong `delete` thì bị bỏ. Chương còn lại là `kept(old)`, được chèn ngay sau mục mới của chương lưu gần nhất phía trước đã được dùng hoặc được giữ, hoặc ở đầu nếu không có chương nào như vậy. Các chương `kept` liền nhau giữ thứ tự cũ.
+   - **Xếp theo số trong một chỗ:** *chỗ* là khoảng giữa hai mục khớp (`reuse`/`changed`) liền nhau trong file, hoặc trước mục khớp đầu tiên, hoặc sau mục khớp cuối cùng. Các chương `kept` bám vào cùng một chỗ (qua quy tắc trên) được trộn với các mục `new` của chỗ đó theo số chương (`title_key`): mỗi chương `kept` đứng sau mọi mục `new` của chỗ đó có `heading_number` nhỏ hơn số của nó. Các mục `new` giữ thứ tự file, các chương `kept` giữ thứ tự cũ (vị trí chèn không giảm dần).
+   - **Chốt an toàn:** nếu trong chỗ đó có chương `kept` không đọc được số, hoặc số của các chương `kept` không tăng dần (ví dụ mỗi quyển đánh lại từ chương 1), thì cả nhóm `kept` của chỗ đó giữ cách cũ: ngay sau mục khớp đứng trước, trước các mục `new`.
+   - Ví dụ: đang lưu 1, 2, 3, 6, 7; file chỉ có 4, 5. Không có mục khớp nên cả truyện là một chỗ, kết quả 1, 2, 3, [4], [5], 6, 7 thay vì 1, 2, 3, 6, 7, [4], [5].
 5. `progress(old_index, position) -> (new_index, position)`:
    - chương đang đọc là `reuse`: giữ `position`;
    - là `kept`: giữ `position`;
@@ -109,8 +112,8 @@ Incoming(position, title, body, heading_number)   # chương trong file (từ Sp
 - `PUT /api/imports/{id}` (chỉnh ranh giới) và `GET .../lines` dùng lại nguyên.
 - `UpdatePreview`:
   - `mode`, `revision`, `warnings[]`;
-  - với append: `anchor {index, title, file_position, match}`, `needs_start`, `to_add[{position, title}]`, `differing[{index, title}]`;
-  - với replace: `counts {reuse, changed, new, missing}`, `edited_lost`, `missing[{index, title, status}]`, `changed[{index, title, status}]`, `progress {from, to, position_kept}`.
+  - với append: `anchor {index, title, file_position, match}`, `needs_start`, `to_add[{position, title}]`, `differing[{index, title}]`, `middle[{position, title}]`;
+  - với replace: `counts {reuse, changed, new, missing}`, `edited_lost`, `missing[{index, title, status}]`, `changed[{index, title, status}]`, `new[{position, title, index}]` (`index` là số chương sau khi tải lại), `progress {from, to, position_kept}`.
 - Danh sách tiêu đề trả về không kèm nội dung. Với 2000 chương, payload vẫn ở mức vài chục KB.
 - **Mã lỗi:**
   - 404: truyện không tồn tại;
@@ -124,8 +127,8 @@ Incoming(position, title, body, heading_number)   # chương trong file (từ Sp
   1. chọn file; dùng lại upload và giới hạn kích thước của `UploadDialog`;
   2. `ImportPreview` sẵn có để chỉnh cách tách; ẩn ô tên và ô ngôn ngữ, vì đã lấy theo truyện;
   3. `UpdateChanges.svelte`: radio chế độ không chọn sẵn, nút xác nhận chỉ bật khi đã chọn. Đổi chế độ thì gọi lại `update-preview`.
-     - Append: neo, danh sách chương sẽ thêm, cảnh báo khoảng trống, ô chọn chương bắt đầu khi `needs_start`, thông báo `differing`.
-     - Replace: các con số, danh sách chương thiếu có checkbox và "chọn tất cả", cảnh báo nổi bật khi `edited_lost > 0`, dòng "Tiến độ đọc: chương 312 → 313".
+     - Append: neo, danh sách chương sẽ thêm, cảnh báo khoảng trống, ô chọn chương bắt đầu khi `needs_start`, thông báo `differing`, thông báo `middle` ("File có N chương truyện chưa có ở giữa, chọn Tải lại cả bộ để chèn đúng chỗ").
+     - Replace: các con số, danh sách chương mới kèm vị trí ("Chương 4: … → vị trí 4"), danh sách chương thiếu có checkbox và "chọn tất cả", cảnh báo nổi bật khi `edited_lost > 0`, dòng "Tiến độ đọc: chương 312 → 313".
 - Gặp 409 revision thì tự gọi lại `update-preview` và báo "Truyện vừa thay đổi, hãy xem lại". Gặp 409 đang bận thì hiện thông điệp và giữ nguyên hộp thoại.
 - Màu, chữ và khoảng cách theo token của ngôn ngữ giao diện "Thủy mặc · Chu sa" đã có. Kiểm tra bằng `npm run check:contrast`.
 
@@ -149,6 +152,7 @@ Incoming(position, title, body, heading_number)   # chương trong file (từ Sp
 ## Risks / Trade-offs
 
 - **[Rủi ro] Ghép tham lam sai khi file sắp xếp lại nhiều chương.** → Màn xem trước hiện rõ danh sách `changed` và `missing` trước khi ghi. Người dùng có thể huỷ hoặc chọn xóa hết rồi tải lại. Thêm test cho các ca chèn, xóa, đổi chỗ, trùng tiêu đề và trùng nội dung.
+- **[Rủi ro] Xếp theo số sai khi số chương đánh lại theo quyển hoặc tiêu đề ghi sai số.** → Chỉ xếp theo số khi các chương `kept` trong chỗ đó đều có số và số tăng dần; còn lại giữ cách cũ. Màn xem trước liệt kê vị trí của từng chương mới để người dùng kiểm tra trước khi ghi.
 - **[Rủi ro] Hai chương thật sự khác nhau nhưng trùng nội dung** (ví dụ chương chỉ có "请假"): mang nhầm bản dịch sang. → Bản dịch của văn bản giống hệt nhau thì vẫn đúng, nên không mất chất lượng.
 - **[Rủi ro] Tác giả sửa chính tả vài chữ thì chương chuyển thành `changed` và phải dịch lại**, kể cả khi đã sửa tay. → Đây là quyết định của người dùng (bỏ bản dịch khi nguồn đổi). Màn xem trước báo số bản sửa tay sẽ mất.
 - **[Đánh đổi] Tải lại xóa rồi chèn lại toàn bộ chương:** với 2000 chương và khoảng 50 MB text là một transaction lớn, vài giây. → Chấp nhận được với một người dùng. `executemany` theo lô. Nếu chậm thì đo ở task kiểm thử thực tế.

@@ -78,7 +78,7 @@ When no anchor is found in `append` mode, the system SHALL compare chapter numbe
 - **THEN** the chapters from that file chapter to the end of the file are the chapters to add
 
 ### Requirement: Append result
-Applying `append` SHALL add the selected file chapters after the last stored chapter, numbered consecutively in file order, and SHALL NOT modify, renumber or delete any stored chapter. If there are no chapters to add, the update SHALL be rejected.
+Applying `append` SHALL add the selected file chapters after the last stored chapter, numbered consecutively in file order, and SHALL NOT modify, renumber or delete any stored chapter. If there are no chapters to add, the update SHALL be rejected. File chapters that are not among the chapters to add and match no stored chapter SHALL be listed on the change preview as missing from the novel, with a notice that `replace` mode inserts them in place; `append` SHALL NOT add them.
 
 #### Scenario: Chapters appended
 - **WHEN** the owner applies an append that adds 20 chapters to a novel with 500 chapters
@@ -92,12 +92,38 @@ Applying `append` SHALL add the selected file chapters after the last stored cha
 - **WHEN** some file chapters before the anchor title-match stored chapters but are not content matches
 - **THEN** the change preview shows a notice that these stored chapters differ from the file and that `replace` mode updates them, and applying `append` leaves them unchanged
 
+#### Scenario: File has chapters missing from the middle of the novel
+- **WHEN** a novel has chapters numbered 1, 2, 3, 6 and 7 and the file contains chapters 1 to 8
+- **THEN** the change preview shows chapter 8 to add and a notice listing file chapters 4 and 5 as missing from the novel with a hint to use `replace`, and applying `append` adds only chapter 8
+
 ### Requirement: Replace follows the file order
 Applying `replace` SHALL make the novel's chapter list follow the file order, numbered from 1. Each file chapter is matched to at most one stored chapter: a content match takes precedence, then a title match, and each stored chapter is matched at most once.
 
 #### Scenario: Chapter inserted in the middle
 - **WHEN** the file has a side story between stored chapters 3 and 4 and the owner applies `replace`
 - **THEN** the side story becomes chapter 4 and the former chapters 4 onward are each numbered one higher
+
+### Requirement: Replace fills missing chapters by number
+In `replace` mode, a place is the span between two consecutive file chapters that match stored chapters, or before the first or after the last of them. When a place holds both new file chapters and kept stored chapters, the system SHALL order them by chapter number: each kept chapter goes after every new chapter in that place with a lower number, and kept chapters keep their stored order.
+
+#### Scenario: File contains only the missing chapters
+- **WHEN** a novel has chapters numbered 1, 2, 3, 6 and 7 and the owner applies `replace` with a file containing only chapters 4 and 5, deleting nothing
+- **THEN** the novel has chapters 1 to 7 in numeric order, chapters 1, 2, 3, 6 and 7 keep their translations, and chapters 4 and 5 are `pending`
+
+#### Scenario: Partial file around the gap
+- **WHEN** a novel has chapters numbered 1, 2, 3, 6 and 7 and the owner applies `replace` with a file containing chapters 3 to 6, deleting nothing
+- **THEN** chapters 4 and 5 are inserted between chapters 3 and 6, and chapters 1, 2 and 7 are kept with their translations
+
+### Requirement: Kept chapters without increasing numbers stay in place
+In `replace` mode, if a kept chapter in a place has no readable chapter number, or the kept chapters' numbers in that place are not increasing, the kept chapters of that place SHALL stay right after the preceding matched chapter, before the new chapters of that place.
+
+#### Scenario: Kept chapters without numbers
+- **WHEN** the kept chapters in a place have titles without a readable chapter number
+- **THEN** they stay right after the preceding matched chapter, before the new chapters of that place
+
+#### Scenario: Numbering restarts per volume
+- **WHEN** the kept chapters in a place are numbered 1, 2, 3 after chapters numbered 98, 99
+- **THEN** the numbers are not increasing, so the kept chapters stay right after the preceding matched chapter, before the new chapters of that place
 
 ### Requirement: Replace reuses unchanged translations
 In `replace` mode, a file chapter that content-matches a stored chapter SHALL keep that chapter's translated title and text, status, provider, model, glossary version and flags, including chapters in status `edited`. No translation request is made for it.
@@ -137,11 +163,15 @@ In `replace` mode, the change preview SHALL list stored chapters that match no f
 - **THEN** every listed chapter is selected for deletion
 
 ### Requirement: Change preview
-Before applying, the system SHALL show a change preview without modifying the novel. For `append` it shows the anchor and the chapters to add. For `replace` it shows the counts of reused, changed, new and missing chapters, the number of edited translations that will be lost, and where reading progress will move.
+Before applying, the system SHALL show a change preview without modifying the novel. For `append` it shows the anchor and the chapters to add. For `replace` it shows the counts of reused, changed, new and missing chapters, each new chapter with the chapter number it will have, the number of edited translations that will be lost, and where reading progress will move.
 
 #### Scenario: Replace preview counts
 - **WHEN** the owner previews `replace` with 497 unchanged, 3 revised (1 edited), 21 new and 1 missing chapter
 - **THEN** the preview shows 497 reused, 3 changed, 21 new, 1 missing, and 1 edited translation that will be lost
+
+#### Scenario: Replace preview shows where new chapters go
+- **WHEN** the owner previews `replace` for a novel with chapters numbered 1, 2, 3, 6 and 7 using a file containing only chapters 4 and 5
+- **THEN** the preview lists the two new chapters as chapters 4 and 5 of the updated novel
 
 #### Scenario: Preview does not modify
 - **WHEN** the owner requests change previews in both modes and then discards the update
