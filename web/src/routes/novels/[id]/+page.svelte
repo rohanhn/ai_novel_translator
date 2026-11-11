@@ -10,8 +10,9 @@
 	import { hanNumber } from '#lib/han.js';
 	import DeleteDialog from '#lib/library/DeleteDialog.svelte';
 	import EditNovelDialog from '#lib/library/EditNovelDialog.svelte';
+	import UpdateDialog from '#lib/library/UpdateDialog.svelte';
 	import { percent, realm } from '#lib/realm.js';
-	import type { ChapterSummary, Novel, Progress, Suggestion } from '#lib/types.js';
+	import type { ChapterSummary, Novel, Progress, Suggestion, UpdateResult } from '#lib/types.js';
 
 	type Filter = 'all' | 'done' | 'review' | 'failed';
 
@@ -24,6 +25,8 @@
 	let filter = $state<Filter>('all');
 	let deleting = $state<Novel | null>(null);
 	let editing = $state(false);
+	let updating = $state(false);
+	let updated = $state('');
 	let introOpen = $state(false);
 
 	// Giới thiệu dài (hơn ~6 dòng) được gập lại, có nút "Xem thêm".
@@ -78,6 +81,16 @@
 		}, 4000);
 		return () => clearInterval(timer);
 	});
+
+	function onupdated(r: UpdateResult) {
+		updated =
+			r.mode === 'append'
+				? `Đã thêm ${r.added} chương mới. Truyện có ${r.chapter_count} chương.`
+				: `Đã tải lại cả bộ: giữ bản dịch ${r.reused} chương, ${r.changed + r.new} chương cần dịch` +
+					(r.deleted ? `, xoá ${r.deleted} chương` : '') +
+					`. Truyện có ${r.chapter_count} chương.`;
+		load(id);
+	}
 
 	function fmtDate(iso: string): string {
 		return new Date(iso).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
@@ -157,7 +170,11 @@
 							<button type="button" class="btn btn-ghost" onclick={() => (editing = true)}>
 								Sửa thông tin
 							</button>
+							<button type="button" class="btn btn-ghost" onclick={() => (updating = true)}>
+								Cập nhật từ txt
+							</button>
 						</div>
+						<p role="status" class="updated">{updated}</p>
 					</div>
 				</div>
 			</ScrollFrame>
@@ -211,11 +228,17 @@
 <DeleteDialog bind:novel={deleting} ondeleted={() => goto('/')} />
 {#if novel}
 	<EditNovelDialog bind:open={editing} {novel} onsaved={(n) => (novel = n)} />
+	<UpdateDialog bind:open={updating} {novel} {onupdated} />
 {/if}
 
 <style>
 	.page {
 		position: relative;
+	}
+	.updated {
+		margin: 0;
+		font-size: 14px;
+		color: var(--jade);
 	}
 	main {
 		position: relative;

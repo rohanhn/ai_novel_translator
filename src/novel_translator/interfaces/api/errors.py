@@ -8,11 +8,18 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from ...application.chapter_update import (
+    LanguageMismatchError,
+    NothingNewError,
+    StalePreviewError,
+    StartRequiredError,
+)
 from ...application.imports import DraftExpiredError
 from ...application.services import (
     ConfirmationRequiredError,
     InvalidOperationError,
     NotFoundError,
+    NovelBusyError,
     PreTranslatedError,
 )
 from ...domain.novel_details import CoverFetchError, InvalidImageError, NovelDetailsError
@@ -38,6 +45,26 @@ async def _pretranslated(_: Request, e: PreTranslatedError):
 
 async def _draft_expired(_: Request, e: DraftExpiredError):
     return _json(410, str(e), code="draft_expired")
+
+
+async def _language_mismatch(_: Request, e: LanguageMismatchError):
+    return _json(422, str(e), code="language_mismatch")
+
+
+async def _start_required(_: Request, e: StartRequiredError):
+    return _json(422, str(e), code="start_required")
+
+
+async def _nothing_new(_: Request, e: NothingNewError):
+    return _json(409, str(e), code="nothing_new")
+
+
+async def _stale_preview(_: Request, e: StalePreviewError):
+    return _json(409, str(e), code="stale_preview")
+
+
+async def _novel_busy(_: Request, e: NovelBusyError):
+    return _json(409, str(e), code="novel_busy")
 
 
 async def _invalid(_: Request, e: InvalidOperationError):
@@ -84,6 +111,11 @@ def install(app: FastAPI) -> None:
     app.add_exception_handler(NotFoundError, _not_found)
     app.add_exception_handler(ConfirmationRequiredError, _confirmation)
     app.add_exception_handler(PreTranslatedError, _pretranslated)
+    app.add_exception_handler(LanguageMismatchError, _language_mismatch)
+    app.add_exception_handler(StartRequiredError, _start_required)
+    app.add_exception_handler(NothingNewError, _nothing_new)
+    app.add_exception_handler(StalePreviewError, _stale_preview)
+    app.add_exception_handler(NovelBusyError, _novel_busy)
     app.add_exception_handler(InvalidOperationError, _invalid)
     app.add_exception_handler(DraftExpiredError, _draft_expired)
     app.add_exception_handler(NovelDetailsError, _novel_details)

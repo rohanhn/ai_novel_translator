@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from novel_translator.application.jobs import JobState, Lane, TranslationJobManager
-from novel_translator.application.services import TranslationService
+from novel_translator.application.services import NovelBusyError, TranslationService
 from novel_translator.domain.models import ChainPolicy, Chapter, ChapterStatus, Novel
 from novel_translator.domain.ports import DailyQuotaError, RefusalError, StreamingProvider
 from novel_translator.providers.echo import EchoProvider
@@ -201,3 +201,42 @@ def test_two_subscribers_receive_same_events_with_echo_delay(repo):
         assert results[0][-1].type == "completed"
     finally:
         mgr.shutdown()
+
+
+# --- chapter-update: giữ truyện khi tải lại cả bộ (design D3) --------------------------------
+
+
+def test_has_jobs_for_novel(env):
+    nid, p, mgr, _ = env
+    assert not mgr.has_jobs_for_novel(nid)
+    gate = p.gate("一")
+    job = mgr.submit(nid, 1, Lane.FOREGROUND)
+    assert p.started["一"].wait(WAIT)
+    assert mgr.has_jobs_for_novel(nid) and not mgr.has_jobs_for_novel(nid + 999)
+    gate.set()
+    assert job.wait(WAIT)
+    assert not mgr.has_jobs_for_novel(nid)
+
+
+def test_submit_rejected_while_novel_held_then_allowed(env, repo):
+    nid, _p, mgr, _ = env
+    other = repo.add_novel(Novel(title="khác"))
+    repo.add_chapters([Chapter(novel_id=other.id, index=1, title="第一章", source_text="一甲")])
+    with mgr.hold_novel(nid):
+        with pytest.raises(NovelBusyError):
+            mgr.submit(nid, 1, Lane.FOREGROUND)
+        assert not mgr.has_jobs_for_novel(nid)
+        other_job = mgr.submit(other.id, 1, Lane.FOREGROUND)  # truyện khác không bị ảnh hưởng
+        assert other_job.wait(WAIT)
+    job = mgr.submit(nid, 1, Lane.FOREGROUND)
+    assert job.wait(WAIT) and job.terminal_event.type == "completed"
+
+
+def test_hold_is_exclusive_and_released_on_error(env):
+    nid, _, mgr, _ = env
+    with mgr.hold_novel(nid), pytest.raises(NovelBusyError), mgr.hold_novel(nid):
+        pass
+    with pytest.raises(RuntimeError), mgr.hold_novel(nid):
+        raise RuntimeError("lỗi")
+    with mgr.hold_novel(nid):  # đã được nhả
+        pass

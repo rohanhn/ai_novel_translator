@@ -17,6 +17,7 @@ import threading
 import time
 from collections import deque
 from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -24,7 +25,7 @@ from typing import Any
 from ..domain.models import ChainEvent, ChainPolicy
 from ..domain.ports import DailyQuotaError, RateQuotaError, TranslationError
 from ..pipeline.sections import Paragraph, Title
-from .services import NotFoundError, TranslationService
+from .services import NotFoundError, NovelBusyError, TranslationService
 
 TERMINAL = frozenset({"completed", "failed", "quota_exhausted", "cancelled"})
 # Job đã kết thúc được giữ lại một lúc để client mở stream sau khi job xong (vd. lỗi ngay sau
@@ -190,6 +191,7 @@ class TranslationJobManager:
     def __init__(self, translation: TranslationService, autostart: bool = True):
         self.translation = translation
         self._jobs: dict[tuple[int, int], Job] = {}
+        self._held: set[int] = set()  # truyện đang cập nhật chương: không nhận job mới
         self._recent: dict[tuple[int, int], tuple[Job, float]] = {}
         self._cond = threading.Condition()
         self._stopping = False
@@ -222,6 +224,8 @@ class TranslationJobManager:
         self.translation.check_translatable(novel_id, index, force, confirm_discard_edits)
         self.start()
         with self._cond:
+            if novel_id in self._held:
+                raise NovelBusyError("Truyện đang được cập nhật chương, hãy thử lại sau.")
             job = self._jobs.get((novel_id, index))
             if job is not None:
                 if (lane == Lane.FOREGROUND and job.lane == Lane.BACKGROUND
@@ -280,6 +284,25 @@ class TranslationJobManager:
                     if k[0] == novel_id and j.state == JobState.QUEUED
                     and (lane is None or j.lane == lane)]
         return sum(self.cancel(*k) for k in keys)
+
+    def has_jobs_for_novel(self, novel_id: int) -> bool:
+        """Còn job chờ hoặc đang chạy của truyện (mọi làn)."""
+        with self._cond:
+            return any(k[0] == novel_id for k in self._jobs)
+
+    @contextmanager
+    def hold_novel(self, novel_id: int) -> Iterator[None]:
+        """Trong khối này `submit` cho truyện bị từ chối (`NovelBusyError`), để không có job mới
+        chen vào giữa lúc kiểm tra và lúc thay danh sách chương (design D3)."""
+        with self._cond:
+            if novel_id in self._held:
+                raise NovelBusyError("Truyện đang được cập nhật chương.")
+            self._held.add(novel_id)
+        try:
+            yield
+        finally:
+            with self._cond:
+                self._held.discard(novel_id)
 
     def is_busy(self, lane: Lane) -> bool:
         with self._cond:

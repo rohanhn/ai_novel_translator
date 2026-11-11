@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import psycopg
 import pytest
 
 from novel_translator.config import Settings
@@ -310,3 +311,75 @@ def test_delete_novel_removes_cover(repo, db):
     repo.delete_novel(n.id)
     with db.connection() as conn:
         assert conn.execute("SELECT count(*) AS n FROM novel_covers").fetchone()["n"] == 0
+
+
+# ---------- chapter-update: thay danh sách chương ----------
+
+
+def test_add_chapters_stores_flags(repo):
+    novel = repo.add_novel(Novel(title="x"))
+    ch = Chapter(novel_id=novel.id, index=1, title="t", source_text="s",
+                 glossary_outdated=True, possible_omission=True)
+    repo.add_chapters([ch])
+    got = repo.get_chapter(novel.id, 1)
+    assert got.id == ch.id and got.glossary_outdated and got.possible_omission
+
+
+def test_replace_chapters_keeps_every_field(repo):
+    novel = _novel_with_chapters(repo, 3)
+    other = _novel_with_chapters(repo, 2)
+    old = repo.list_chapters(novel.id)
+    kept = old[2]
+    kept.translated_title, kept.translated_text = "Chương 3", "Bản dịch"
+    kept.status, kept.provider, kept.model = ChapterStatus.EDITED, "gemini", "m"
+    kept.chain_step, kept.glossary_version = 2, 5
+    kept.glossary_outdated = kept.possible_omission = True
+    repo.update_chapter(kept)
+    kept = repo.get_chapter(novel.id, 3)
+
+    new = [
+        Chapter(novel_id=novel.id, index=1, title="mới", source_text="nội dung mới"),
+        Chapter(novel_id=novel.id, index=2, title=kept.title, source_text=kept.source_text,
+                translated_title=kept.translated_title, translated_text=kept.translated_text,
+                status=kept.status, provider=kept.provider, model=kept.model,
+                chain_step=kept.chain_step, glossary_version=kept.glossary_version,
+                glossary_outdated=True, possible_omission=True, updated_at=kept.updated_at),
+    ]
+    repo.replace_chapters(novel.id, new)
+    got = repo.list_chapters(novel.id)
+    assert [c.index for c in got] == [1, 2] and [c.id for c in got] == [c.id for c in new]
+    g = got[1]
+    assert (g.title, g.source_text, g.translated_title, g.translated_text) == (
+        kept.title, kept.source_text, "Chương 3", "Bản dịch")
+    assert (g.status, g.provider, g.model, g.chain_step, g.glossary_version) == (
+        ChapterStatus.EDITED, "gemini", "m", 2, 5)
+    assert g.glossary_outdated and g.possible_omission
+    assert got[0].status == ChapterStatus.PENDING
+    assert len(repo.list_chapters(other.id)) == 2  # truyện khác không bị đụng
+
+
+def test_replace_chapters_rolls_back_on_failure(repo):
+    novel = _novel_with_chapters(repo, 3)
+    before = [(c.id, c.index, c.title) for c in repo.list_chapters(novel.id)]
+    dup = [Chapter(novel_id=novel.id, index=1, title="a", source_text="a"),
+           Chapter(novel_id=novel.id, index=1, title="b", source_text="b")]  # vi phạm UNIQUE
+    with pytest.raises(psycopg.errors.UniqueViolation):
+        repo.replace_chapters(novel.id, dup)
+    assert [(c.id, c.index, c.title) for c in repo.list_chapters(novel.id)] == before
+
+
+def test_replace_chapters_inside_outer_unit_of_work_rolls_back_together(repo):
+    novel = _novel_with_chapters(repo, 2)
+    before = [(c.id, c.title) for c in repo.list_chapters(novel.id)]
+    with pytest.raises(RuntimeError), repo.unit_of_work():
+        repo.replace_chapters(novel.id, [Chapter(novel_id=novel.id, index=1, title="x",
+                                                 source_text="x")])
+        raise RuntimeError("lỗi giữa chừng")
+    assert [(c.id, c.title) for c in repo.list_chapters(novel.id)] == before
+
+
+def test_replace_chapters_rejects_foreign_chapters(repo):
+    novel = _novel_with_chapters(repo, 1)
+    with pytest.raises(ValueError):
+        repo.replace_chapters(novel.id, [Chapter(novel_id=novel.id + 999, index=1, title="x",
+                                                 source_text="x")])

@@ -139,3 +139,29 @@ def test_invalid_boundaries_rejected(drafts):
 
 def test_container_wires_import_service(container):
     assert isinstance(container.imports, ImportDraftService)
+
+
+# --- chapter-update: draft gắn truyện ---------------------------------------------------------
+
+
+def test_update_draft_for_unknown_novel(drafts):
+    from novel_translator.application.services import NotFoundError
+
+    with pytest.raises(NotFoundError):
+        drafts.create("a.txt", VI, novel_id=987654)
+
+
+def test_update_draft_is_bound_and_cannot_create_a_novel(container, drafts):
+    from novel_translator.application.services import InvalidOperationError
+
+    novel = container.library.import_bytes(VI, "Kiếm Lai").novel
+    d = drafts.create("moi.txt", VI, novel_id=novel.id)
+    assert d.novel_id == novel.id and len(d.plan.chapters) == 4
+    with pytest.raises(InvalidOperationError):
+        drafts.commit(d.id, None, None, d.plan.boundaries)
+    assert len(container.library.list_novels()) == 1
+    assert drafts.get(d.id).novel_id == novel.id  # draft vẫn còn
+
+
+def test_import_draft_has_no_novel(drafts):
+    assert drafts.create("a.txt", VI).novel_id is None

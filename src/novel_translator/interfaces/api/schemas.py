@@ -7,7 +7,9 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from ...application.chapter_update import ProgressMove, UpdatePreview, UpdateResult
 from ...application.imports import Draft
+from ...domain.chapter_merge import EntryKind, StoredRef
 from ...domain.chapter_split import SplitWarning
 from ...domain.models import (
     Chapter,
@@ -189,6 +191,7 @@ class FrontMatterOut(BaseModel):
 
 class ImportPreview(BaseModel):
     id: str
+    novel_id: int | None = None  # có giá trị: bản xem trước để cập nhật chương của truyện này
     filename: str
     default_title: str
     detected_lang: str  # zh | vi | unknown
@@ -203,7 +206,7 @@ class ImportPreview(BaseModel):
         p = d.plan
         fm = p.front_matter
         return cls(
-            id=d.id, filename=d.filename, default_title=d.default_title,
+            id=d.id, novel_id=d.novel_id, filename=d.filename, default_title=d.default_title,
             detected_lang=d.detected_lang, line_count=p.line_count, boundaries=p.boundaries,
             front_matter=FrontMatterOut(start_line=fm.start_line, end_line=fm.end_line,
                                         chars=fm.chars, excerpt=_excerpt(fm.text), keep=fm.keep)
@@ -225,6 +228,139 @@ class ImportAdjustIn(BaseModel):
 class ImportCommitIn(ImportAdjustIn):
     title: str | None = Field(None, max_length=300)
     lang: Literal["zh", "vi"] | None = None
+
+
+class UpdateIn(ImportAdjustIn):
+    """Tính thay đổi khi cập nhật chương (spec `chapter-update`). `mode` bắt buộc (422 nếu thiếu)."""
+
+    mode: Literal["append", "replace"]
+    start: int | None = Field(None, ge=1)  # chế độ thêm: vị trí chương bắt đầu trong file
+    delete: list[int] = Field(default_factory=list)  # tải lại: index chương thiếu sẽ xóa
+
+
+class UpdateApplyIn(UpdateIn):
+    revision: str = Field(min_length=1, max_length=64)
+
+
+class StoredChapterRef(BaseModel):
+    index: int
+    title: str
+    status: str
+
+    @classmethod
+    def of(cls, s: StoredRef) -> StoredChapterRef:
+        return cls(index=s.index, title=s.title, status=s.status)
+
+
+class FileChapterRef(BaseModel):
+    position: int  # thứ tự trong file (= `number` của chương trong ImportPreview)
+    title: str
+
+
+class AnchorOut(BaseModel):
+    index: int
+    title: str
+    position: int
+    match: Literal["content", "title"]
+
+
+class ProgressMoveOut(BaseModel):
+    from_index: int
+    from_position: float
+    to_index: int
+    to_position: float
+
+    @classmethod
+    def of(cls, m: ProgressMove | None) -> ProgressMoveOut | None:
+        if m is None:
+            return None
+        return cls(from_index=m.from_index, from_position=m.from_position,
+                   to_index=m.to_index, to_position=m.to_position)
+
+
+class NewChapterRef(BaseModel):
+    """Chương mới khi tải lại: vị trí trong file và số chương sẽ nhận sau khi tải lại."""
+
+    position: int
+    title: str
+    index: int
+
+
+class UpdateCounts(BaseModel):
+    reuse: int
+    changed: int
+    new: int
+    missing: int
+
+
+class UpdatePreviewOut(BaseModel):
+    mode: Literal["append", "replace"]
+    revision: str
+    stored_count: int
+    incoming_count: int
+    warnings: list[SplitWarningOut]
+    # chế độ thêm
+    anchor: AnchorOut | None = None
+    needs_start: bool = False
+    nothing_new: bool = False
+    to_add: list[FileChapterRef] = Field(default_factory=list)
+    differing: list[StoredChapterRef] = Field(default_factory=list)
+    middle: list[FileChapterRef] = Field(default_factory=list)  # chương thiếu ở giữa
+    # chế độ tải lại
+    counts: UpdateCounts | None = None
+    changed: list[StoredChapterRef] = Field(default_factory=list)
+    missing: list[StoredChapterRef] = Field(default_factory=list)
+    new: list[NewChapterRef] = Field(default_factory=list)
+    edited_lost: list[StoredChapterRef] = Field(default_factory=list)
+    progress: ProgressMoveOut | None = None
+
+    @classmethod
+    def of(cls, p: UpdatePreview) -> UpdatePreviewOut:
+        out = cls(mode=p.mode.value, revision=p.revision, stored_count=p.stored_count,
+                  incoming_count=p.incoming_count, warnings=[], progress=ProgressMoveOut.of(
+                      p.progress))
+        if p.append is not None:
+            a = p.append
+            out.warnings = [SplitWarningOut(code=w.code, message=w.message, params=w.params)
+                            for w in a.warnings]
+            out.anchor = AnchorOut(index=a.anchor.stored_index, title=a.anchor.title,
+                                   position=a.anchor.position, match=a.anchor.match) \
+                if a.anchor else None
+            out.needs_start, out.nothing_new = a.needs_start, a.nothing_new
+            out.to_add = [FileChapterRef(position=c.position, title=c.title) for c in a.to_add]
+            out.differing = [StoredChapterRef.of(s) for s in a.differing]
+            out.middle = [FileChapterRef(position=c.position, title=c.title) for c in a.middle]
+        if p.replace is not None:
+            r = p.replace
+            out.counts = UpdateCounts(reuse=r.count(EntryKind.REUSE),
+                                      changed=r.count(EntryKind.CHANGED),
+                                      new=r.count(EntryKind.NEW), missing=len(r.missing))
+            out.changed = [StoredChapterRef.of(e.stored) for e in r.entries
+                           if e.kind is EntryKind.CHANGED]
+            out.missing = [StoredChapterRef.of(s) for s in r.missing]
+            out.new = [NewChapterRef(position=e.incoming.position, title=e.incoming.title, index=i)
+                       for i, e in enumerate(r.entries, start=1) if e.kind is EntryKind.NEW]
+            out.edited_lost = [StoredChapterRef.of(s) for s in r.edited_lost]
+        return out
+
+
+class UpdateResultOut(BaseModel):
+    novel: NovelOut
+    mode: Literal["append", "replace"]
+    chapter_count: int
+    added: int
+    reused: int
+    changed: int
+    new: int
+    kept: int
+    deleted: int
+    progress: ProgressMoveOut | None
+
+    @classmethod
+    def of(cls, r: UpdateResult) -> UpdateResultOut:
+        return cls(novel=NovelOut.of(r.novel), mode=r.mode.value, chapter_count=r.chapter_count,
+                   added=r.added, reused=r.reused, changed=r.changed, new=r.new, kept=r.kept,
+                   deleted=r.deleted, progress=ProgressMoveOut.of(r.progress))
 
 
 class ImportLinesOut(BaseModel):

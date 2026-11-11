@@ -7,7 +7,7 @@ from pathlib import Path
 
 import typer
 
-from ...application.services import NotFoundError
+from ...application.services import InvalidOperationError, NotFoundError
 from ...container import Container, DatabaseConfigError, get_container
 from ...domain.models import ChainEvent
 from ...domain.ports import DailyQuotaError, TranslationError
@@ -37,8 +37,17 @@ def import_novel(
     lang: str | None = typer.Option(
         None, "--lang", help="Ngôn ngữ file: zh (raw, cần dịch) | vi (bản dịch có sẵn)."
     ),
+    into: int | None = typer.Option(
+        None, "--into", help="Thêm chương mới vào truyện có id này (nối sau chương cuối) thay "
+        "vì tạo truyện mới. Tải lại cả bộ: dùng web."
+    ),
 ):
     """Nhập truyện từ file .txt: tự tách chương (Trung/Việt) và nhận diện ngôn ngữ, lưu ngay."""
+    if into is not None:
+        if title is not None or lang is not None:
+            _fail("--into không dùng cùng --title hoặc --lang (lấy theo truyện có sẵn).")
+        _append_into(path, into)
+        return
     if lang is not None and lang not in ("zh", "vi"):
         _fail("--lang chỉ nhận zh hoặc vi.")
     try:
@@ -57,6 +66,31 @@ def import_novel(
         for w in ch.warnings:
             typer.secho(f"Cảnh báo · chương {ch.number} '{ch.title}': {w.message}",
                         fg=typer.colors.YELLOW)
+
+
+def _append_into(path: Path, novel_id: int) -> None:
+    """`novel import <file> --into <id>` (spec chapter-update "CLI append")."""
+    c = _c()
+    try:
+        text = c.library.loader.read_text(path)
+        res, plan = c.chapter_updates.append_text(novel_id, text)
+    except NotFoundError as e:
+        _fail(str(e))
+    except InvalidOperationError as e:
+        _fail(f"{e} Dùng \"Cập nhật từ txt\" trên web để chọn chỗ nối hoặc tải lại cả bộ.")
+    except (ValueError, OSError) as e:
+        _fail(str(e))
+    if plan.anchor:
+        typer.echo(f"Điểm nối: sau chương {plan.anchor.stored_index} '{plan.anchor.title}'")
+    else:
+        typer.echo("Điểm nối: file bắt đầu ngay sau chương cuối (theo số chương)")
+    for w in plan.warnings:
+        typer.secho(f"Cảnh báo: {w.message}", fg=typer.colors.YELLOW)
+    typer.echo(f"Đã thêm {res.added} chương vào truyện #{novel_id} '{res.novel.title}' "
+               f"(tổng {res.chapter_count} chương)")
+    if plan.differing:
+        typer.secho(f"Lưu ý: {len(plan.differing)} chương cũ khác nội dung trong file, không bị "
+                    "đổi; dùng tải lại cả bộ trên web nếu muốn cập nhật.", fg=typer.colors.YELLOW)
 
 
 @app.command("list")

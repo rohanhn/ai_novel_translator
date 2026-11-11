@@ -16,14 +16,20 @@
 	let {
 		preview = $bindable(),
 		onsaved,
+		onnext,
 		onexpired,
 		oncancel
 	}: {
 		preview: ImportPreview;
-		onsaved: (n: Novel) => void;
+		/** Import truyện mới: lưu vào thư viện. */
+		onsaved?: (n: Novel) => void;
+		/** Cập nhật chương (draft có `novel_id`): ẩn tên + ngôn ngữ, nút chính sang bước kế. */
+		onnext?: () => void;
 		onexpired: (message: string) => void;
 		oncancel: () => void;
 	} = $props();
+
+	const updating = $derived(preview.novel_id != null);
 
 	let title = $state('');
 	// svelte-ignore state_referenced_locally
@@ -119,6 +125,10 @@
 	}
 
 	async function save() {
+		if (updating) {
+			onnext?.();
+			return;
+		}
 		busy = true;
 		error = '';
 		try {
@@ -128,7 +138,7 @@
 				boundaries: preview.boundaries,
 				keep_front_matter: keepFront
 			});
-			onsaved(novel);
+			onsaved?.(novel);
 		} catch (err) {
 			fail(err);
 		} finally {
@@ -141,6 +151,7 @@
 
 <div class="preview" aria-busy={busy}>
 	<div class="scroll">
+	{#if !updating}
 	<label class="field-row">
 		Tên truyện
 		<input class="field" bind:value={title} placeholder={preview.default_title} maxlength="200" />
@@ -161,6 +172,7 @@
 			đọc ngay</label
 		>
 	</fieldset>
+	{/if}
 
 	<div class="summary">
 		<p class="count">
@@ -278,7 +290,7 @@
 	<div class="actions">
 		<button type="button" class="btn" onclick={oncancel}>Huỷ</button>
 		<button type="button" class="btn btn-primary" disabled={busy} onclick={save}>
-			{busy ? 'Đang xử lý…' : 'Lưu vào thư viện'}
+			{busy ? 'Đang xử lý…' : updating ? 'Tiếp tục · xem thay đổi' : 'Lưu vào thư viện'}
 		</button>
 	</div>
 </div>
