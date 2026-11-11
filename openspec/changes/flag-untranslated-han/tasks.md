@@ -2,7 +2,7 @@
 
 ## 1. Hàm đếm (domain)
 
-- [ ] 1.1 Tạo `domain/han_residue.py` (design D1): `is_han` (chuyển từ `chapter_split._is_han`, `chapter_split` import lại), `kept_chars`, `residue(title, text, kept) -> Residue(count, chars)`. Kiểm tra bằng `tests/test_han_residue.py` theo các scenario "Han characters left in the translation", "Clean translation", "Han character kept on purpose by the glossary", "Chinese punctuation is not counted", kèm chữ Ext B và chữ trong tiêu đề; test nhận diện ngôn ngữ của `chapter_split` vẫn pass.
+- [x] 1.1 Tạo `domain/han_residue.py` (design D1): `is_han` (chuyển từ `chapter_split._is_han`, `chapter_split` import lại), `kept_chars`, `residue(title, text, kept) -> Residue(count, chars)`. Kiểm tra bằng `tests/test_han_residue.py` theo các scenario "Han characters left in the translation", "Clean translation", "Han character kept on purpose by the glossary", "Chinese punctuation is not counted", kèm chữ Ext B và chữ trong tiêu đề; test nhận diện ngôn ngữ của `chapter_split` vẫn pass.
 
 ## 2. Lưu trữ
 

@@ -11,6 +11,8 @@ import unicodedata
 from dataclasses import dataclass
 from enum import Enum
 
+from .han_residue import is_han
+
 MAX_HEADING_CHARS = 80
 
 # Dấu kết câu: dòng kết thúc bằng các dấu này không phải tiêu đề (trừ khi dấu đứng ngay sau số).
@@ -203,12 +205,6 @@ _VI_LETTERS = set(
 )
 
 
-def _is_han(c: str) -> bool:
-    o = ord(c)
-    return (0x4E00 <= o <= 0x9FFF or 0x3400 <= o <= 0x4DBF or 0x20000 <= o <= 0x2A6DF
-            or 0xF900 <= o <= 0xFAFF)
-
-
 def detect_language(text: str) -> str:
     """`zh` khi chữ Hán ≥30% số chữ cái; không thì `vi` nếu có chữ cái đặc trưng tiếng Việt;
     còn lại `unknown`. Chỉ xét 200.000 ký tự đầu."""
@@ -216,7 +212,7 @@ def detect_language(text: str) -> str:
     han = latin = 0
     vi = False
     for c in sample:
-        if _is_han(c):
+        if is_han(c):
             han += 1
         elif c.isalpha():
             latin += 1
