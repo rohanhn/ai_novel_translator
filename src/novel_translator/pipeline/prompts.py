@@ -18,6 +18,7 @@ Yêu cầu dịch:
 - Dịch trọn vẹn, đúng nghĩa, văn phong tự nhiên, mượt như truyện xuất bản tiếng Việt.
 - Giữ nguyên số đoạn và thứ tự đoạn: mỗi đoạn nguồn là MỘT dòng dịch; không gộp, không bỏ đoạn.
 - Tên riêng, chiêu thức, cảnh giới, địa danh dùng Hán-Việt khi phù hợp với thể loại.
+- Không để lại chữ Hán trong bản dịch: mọi từ phải dịch nghĩa hoặc phiên âm Hán-Việt.
 - Xưng hô phù hợp quan hệ nhân vật và bối cảnh (cổ đại/hiện đại).
 - Không giải thích, không thêm ghi chú ngoài định dạng dưới đây.
 

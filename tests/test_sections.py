@@ -127,6 +127,11 @@ def test_system_prompt_format_example_and_glossary():
     assert system == build_system_prompt(novel, list(reversed(glossary)))
 
 
+def test_system_prompt_forbids_leftover_han():
+    system = build_system_prompt(Novel(title="t"), [])
+    assert "Không để lại chữ Hán trong bản dịch" in system
+
+
 def test_user_prompt_title_only_on_first_segment():
     assert build_user_prompt("内容", "第一章") == "<<TITLE>>\n第一章\n<<BODY>>\n内容\n"
     assert build_user_prompt("内容") == "<<BODY>>\n内容\n"

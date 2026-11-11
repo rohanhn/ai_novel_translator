@@ -13,7 +13,7 @@
 ## 3. Ghi số đếm (application)
 
 - [x] 3.1 `translate_chapter` và `edit_chapter` ghi `untranslated_han` (design D3); payload `completed` của job có `untranslated_han`. Kiểm tra bằng test service với provider `echo` hoặc provider giả trả text có chữ Hán, theo các scenario "Han characters left in the translation", "Re-translation", "Manual edit removes the leftovers"; tải lại cả bộ giữ số đếm của chương `reuse`, và chương `changed` có số đếm 0 (`tests/test_chapter_update.py`).
-- [ ] 3.2 Prompt thêm dòng "không để lại chữ Hán" (design D6). Kiểm tra bằng test prompt: dòng có trong system prompt, và system prompt giống nhau giữa các đoạn.
+- [x] 3.2 Prompt thêm dòng "không để lại chữ Hán" (design D6). Kiểm tra bằng test prompt: dòng có trong system prompt, và system prompt giống nhau giữa các đoạn.
 
 ## 4. API và CLI
 
